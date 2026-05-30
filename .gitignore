@@ -9,3 +9,7 @@ npm-debug.log*
 .env.local
 coverage/
 .vite/
+
+# Internal planning artifacts kept out of the public repo
+docs/specs/
+docs/plans/
