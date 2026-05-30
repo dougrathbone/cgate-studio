@@ -32,6 +32,14 @@ export class CgateService extends EventEmitter {
   }
 
   async connect(opts: ConnectOptions): Promise<void> {
+    // Re-connect safety: the Connect action stays enabled, so connect() can be
+    // called again on an already-connected service. Tear down the prior pair
+    // first (destroys sockets, removes listeners, clears self-reconnect, nulls
+    // them, settles any in-flight getTree) so we never orphan the old event
+    // connection (double 'state' emits) or leak the old command socket.
+    if (this.command || this.event) {
+      await this.disconnect();
+    }
     this.setStatus('connecting');
     this.command = new CgateConnection('command', opts.host, opts.commandPort, {
       cgateusername: opts.username,
