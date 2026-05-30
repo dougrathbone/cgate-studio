@@ -72,6 +72,31 @@ describe('treexml', () => {
     ]);
   });
 
+  it('rejects when the XML payload is malformed', async () => {
+    const raw = '343-Begin\r\n343-<Network\r\n344 End.\r\n';
+    await expect(parseTreeXml(raw, '254')).rejects.toThrow('TREEXML parse error');
+  });
+
+  it('passes through lines without a response-code prefix', () => {
+    expect(stripResponseCodes('<Raw>data</Raw>')).toBe('<Raw>data</Raw>');
+  });
+
+  it('falls back to a nested network node that lacks Units / id match', async () => {
+    const raw =
+      '347-<Network><Interface><Network><NetworkNumber>254</NetworkNumber>' +
+      '</Network></Interface></Network>\r\n344 End.\r\n';
+    const tree = await parseTreeXml(raw, '999');
+    expect(tree[0].address).toBe('254');
+    expect(tree[0].applications).toEqual([]);
+  });
+
+  it('falls back to the flat network node when no interface wrapper exists', async () => {
+    const raw =
+      '347-<Network><NetworkNumber>254</NetworkNumber></Network>\r\n344 End.\r\n';
+    const tree = await parseTreeXml(raw, '999');
+    expect(tree[0].address).toBe('254');
+  });
+
   it('missing Label yields null', async () => {
     const raw =
       '343-Begin XML snippet\r\n' +

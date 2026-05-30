@@ -53,6 +53,22 @@ describe('CgateService', () => {
     }
   });
 
+  it('maps on/off events to states and skips invalid/blank lines', () => {
+    svc = new CgateService();
+    const states: any[] = [];
+    svc.on('state', (s) => states.push(s));
+    // Drive the event handler directly with a multi-line buffer: an on event
+    // with no explicit level (-> 255), an unparseable line (skipped), a blank
+    // line (skipped), and an off event (-> level 0).
+    (svc as any).handleEventData(
+      Buffer.from('lighting on 254/56/4\nnot-a-valid-event\n\nlighting off 254/56/5\n'),
+    );
+    expect(states).toEqual([
+      { address: '254/56/4', level: 255, on: true },
+      { address: '254/56/5', level: 0, on: false },
+    ]);
+  });
+
   it('connect rejects (and does not crash) when the C-Gate is unreachable', async () => {
     svc = new CgateService();
     // Port 1 refuses immediately on localhost, so this rejects fast and

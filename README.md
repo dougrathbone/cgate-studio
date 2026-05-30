@@ -44,11 +44,17 @@ its documented interface." CBus Studio is that front-end.
 ## Getting started
 
 ```bash
-npm install      # install dependencies
-npm run dev      # launch the app (electron-vite dev)
-npm test         # run the Jest test suite
-npm run build    # production build (main + preload + renderer)
+npm install          # install dependencies
+npm run dev          # launch the app (electron-vite dev)
+npm test             # run the Jest test suite
+npm run test:coverage # run tests + enforce the 80% coverage threshold
+npm run build        # production build (main + preload + renderer)
 ```
+
+The full stack — vendored C-Gate client, the main-process `CgateService`, the
+IPC/preload bridge, and the React renderer — is unit-tested (renderer components
+via `@testing-library/react` under jsdom; all networked logic against the
+in-process mock C-Gate). CI enforces a global **80% coverage** floor.
 
 `npm run dev` opens the app window; enter your C-Gate host and ports and click
 **Connect** to browse the network. A manual hardware-verification checklist lives in
