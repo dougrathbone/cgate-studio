@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerIpc } from './ipc';
+import { SiteStore } from './SiteStore';
 
 let win: BrowserWindow | null = null;
 
@@ -22,7 +23,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  registerIpc(() => win);
+  const siteStore = new SiteStore(path.join(app.getPath('userData'), 'sites.json'));
+  registerIpc(() => win, siteStore);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

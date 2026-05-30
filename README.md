@@ -20,6 +20,9 @@ its documented interface." CBus Studio is that front-end.
 
 ### Available now — M1: Connect & Browse (read-only)
 
+- Save **multiple C-Gate sites** (one per location) — name + host + command/event
+  ports — and switch between them with one click. Sites persist locally (in the
+  app's `userData` directory) so installers don't re-type connection details.
 - Connect to an existing C-Gate over TCP (command + event/status ports).
 - Render the network tree — **networks → applications → groups** — with labels,
   parsed from `TREEXML`.

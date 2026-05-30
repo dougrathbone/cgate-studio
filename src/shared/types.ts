@@ -7,6 +7,19 @@ export interface ConnectOptions {
   password?: string;
 }
 
+// A saved C-Gate connection ("site"). Installers can store one per location so
+// they can switch between multiple C-Gate servers without re-typing host/ports.
+export interface Site {
+  id: string;          // stable uuid, assigned by the store
+  name: string;        // human label, e.g. "Smith residence"
+  host: string;
+  commandPort: number;
+  eventPort: number;
+}
+
+// A new site before the store has assigned it an id.
+export type SiteInput = Omit<Site, 'id'>;
+
 export interface GroupNode {
   kind: 'group';
   address: string;        // "254/56/4"

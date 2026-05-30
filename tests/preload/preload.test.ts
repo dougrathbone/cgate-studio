@@ -52,4 +52,16 @@ describe('preload bridge', () => {
     off();
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:state', expect.any(Function));
   });
+
+  it('exposes a sites API mapped to the sites IPC channels', async () => {
+    const input = { name: 'Home', host: 'h', commandPort: 1, eventPort: 2 };
+    await api.sites.list();
+    await api.sites.add(input);
+    await api.sites.update({ id: 'x', ...input });
+    await api.sites.remove('x');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:list');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:add', input);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:update', { id: 'x', ...input });
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:remove', 'x');
+  });
 });

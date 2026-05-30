@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ConnectOptions, Tree, GroupState, ConnectionStatus } from '../shared/types';
+import type {
+  ConnectOptions,
+  Tree,
+  GroupState,
+  ConnectionStatus,
+  Site,
+  SiteInput,
+} from '../shared/types';
 
 const CH = {
   connect: 'cgate:connect',
@@ -7,6 +14,10 @@ const CH = {
   getTree: 'cgate:getTree',
   status: 'cgate:status',
   state: 'cgate:state',
+  sitesList: 'sites:list',
+  sitesAdd: 'sites:add',
+  sitesUpdate: 'sites:update',
+  sitesRemove: 'sites:remove',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
@@ -22,5 +33,11 @@ contextBridge.exposeInMainWorld('cgate', {
     const h = (_e: unknown, s: GroupState) => cb(s);
     ipcRenderer.on(CH.state, h);
     return () => ipcRenderer.removeListener(CH.state, h);
+  },
+  sites: {
+    list: (): Promise<Site[]> => ipcRenderer.invoke(CH.sitesList),
+    add: (input: SiteInput): Promise<Site[]> => ipcRenderer.invoke(CH.sitesAdd, input),
+    update: (site: Site): Promise<Site[]> => ipcRenderer.invoke(CH.sitesUpdate, site),
+    remove: (id: string): Promise<Site[]> => ipcRenderer.invoke(CH.sitesRemove, id),
   },
 });
