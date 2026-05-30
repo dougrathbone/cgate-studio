@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { cgate } from './api';
 import { ConnectionForm } from './components/ConnectionForm';
+import { NetworkTree } from './components/NetworkTree';
 import type { ConnectionStatus, Tree, GroupState, ConnectOptions } from '../shared/types';
 
 export function App() {
@@ -27,8 +28,7 @@ export function App() {
         <span style={{ padding: 12 }}>Status: <strong>{status}</strong></span>
       </header>
       <main style={{ flex: 1, overflow: 'auto', padding: 12 }}>
-        {/* NetworkTree rendered in Task 11 */}
-        <pre>{JSON.stringify({ networks: tree.length, live: Object.keys(states).length }, null, 2)}</pre>
+        <NetworkTree tree={tree} states={states} />
       </main>
     </div>
   );
