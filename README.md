@@ -54,6 +54,24 @@ npm run build    # production build (main + preload + renderer)
 **Connect** to browse the network. A manual hardware-verification checklist lives in
 [`docs/smoke-checklist-m1.md`](docs/smoke-checklist-m1.md).
 
+### Building installers
+
+[`electron-builder`](https://www.electron.build/) produces native installers into
+`release/`:
+
+```bash
+npm run dist:mac   # macOS .dmg + .zip (built on macOS)
+npm run dist:win   # Windows NSIS .exe installer (built on Windows)
+npm run dist       # installer(s) for the current host platform
+```
+
+Each platform's installer must be built on that platform. Pushing a `v*` tag (e.g.
+`v1.0.0`) runs the **Release** GitHub Actions workflow, which builds the macOS and
+Windows installers on their respective runners and attaches them to a GitHub
+Release. Builds are currently **unsigned** (no Apple Developer / Windows
+code-signing certificate yet), so the OS will show the usual unidentified-developer
+warning on first launch.
+
 ## Architecture
 
 ```

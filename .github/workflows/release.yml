@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  # Build + publish installers when a version tag is pushed, e.g. v1.0.0.
+  push:
+    tags: ['v*']
+  # Allow building installers on demand (artifacts only, no Release).
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installers:
+    name: Installer (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run dist:${{ matrix.platform }}
+        env:
+          # No Apple Developer cert in CI — build unsigned instead of failing.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbus-studio-${{ matrix.platform }}
+          path: |
+            release/*.dmg
+            release/*.exe
+            release/*-mac.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Attach installers to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.dmg
+            release/*.exe
+            release/*-mac.zip
