@@ -1,0 +1,335 @@
+const net = require('net');
+const { EventEmitter } = require('events');
+const { createLogger } = require('./logger');
+const { backoffDelay } = require('./backoff');
+const { 
+    CGATE_CMD_EVENT_ON, 
+    CGATE_CMD_LOGIN, 
+    NEWLINE 
+} = require('./constants');
+
+class CgateConnection extends EventEmitter {
+    constructor(type, host, port, settings = {}) {
+        super();
+        this.type = type; // 'command' or 'event'
+        this.host = host;
+        this.port = port;
+        this.settings = settings;
+        
+        this.socket = null;
+        this.connected = false;
+        this.reconnectAttempts = 0;
+        this.reconnectTimeout = null;
+        this.maxReconnectAttempts = 10;
+        this.reconnectInitialDelay = settings.reconnectinitialdelay || 1000;
+        this.reconnectMaxDelay = settings.reconnectmaxdelay || 60000;
+        this.connectionTimeout = Math.max(1000, settings.connectionTimeout || 5000);
+        this.logger = createLogger({ component: `CgateConnection-${type}` });
+        
+        // Pool support properties
+        this.poolIndex = -1;
+        this.lastActivity = Date.now();
+        this.retryCount = 0;
+        this.isDestroyed = false;
+        this.isWritable = true;
+        this._drainWaiters = [];
+
+        // Keep-alive for event connection
+        this.keepAliveTimer = null;
+        this.keepAliveInterval = type === 'event'
+            ? Math.max(10000, settings.eventConnectionKeepAliveInterval || settings.keepAliveInterval || 60000)
+            : null;
+    }
+
+    connect() {
+        if (this.socket && !this.socket.destroyed) {
+            this.logger.info(`${this.type} socket already exists and is not destroyed. Destroying it first.`);
+            this.socket.destroy();
+        }
+
+        this.logger.info(`Connecting to C-Gate ${this.type} port: ${this.host}:${this.port}`);
+        
+        this.socket = net.createConnection(this.port, this.host);
+        this.socket.setTimeout(this.connectionTimeout);
+        
+        this.socket.on('connect', () => this._handleConnect());
+        this.socket.on('close', (hadError) => this._handleClose(hadError));
+        this.socket.on('error', (err) => this._handleError(err));
+        this.socket.on('data', (data) => this._handleData(data));
+        this.socket.on('timeout', () => this._handleTimeout());
+        this.socket.on('drain', () => this._handleDrain());
+        
+        return this;
+    }
+
+    disconnect() {
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+
+        this._stopKeepAlive();
+
+        if (this.socket && !this.socket.destroyed) {
+            this.socket.removeAllListeners();
+            this.socket.destroy();
+        }
+
+        this.socket = null;
+        this.connected = false;
+        this.reconnectAttempts = 0;
+        this.isDestroyed = true;
+        this.isWritable = false;
+        this._resolveDrainWaiters(false);
+    }
+
+    send(data) {
+        if (!this.socket || this.socket.destroyed || !this.connected) {
+            this.logger.warn(`Cannot send data on ${this.type} socket: not connected`);
+            return false;
+        }
+
+        if (!this.isWritable) {
+            return false;
+        }
+
+        try {
+            const writable = this.socket.write(data);
+            this.lastActivity = Date.now(); // Update activity timestamp for pool health monitoring
+            this.isWritable = writable;
+            if (!writable) {
+                this.emit('backpressure', { poolIndex: this.poolIndex });
+            }
+            return writable;
+        } catch (error) {
+            this.logger.error(`Error writing to ${this.type} socket:`, { error });
+            return false;
+        }
+    }
+
+    async sendWithBackpressure(data) {
+        const writableNow = this.send(data);
+        if (writableNow) {
+            return true;
+        }
+        if (!this.connected || !this.socket || this.socket.destroyed) {
+            return false;
+        }
+
+        const drained = await this._waitForDrain();
+        if (!drained || !this.connected || !this.socket || this.socket.destroyed) {
+            return false;
+        }
+        return this.send(data);
+    }
+
+    _handleConnect() {
+        this.connected = true;
+        this.reconnectAttempts = 0;
+        this.isWritable = true;
+        
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+        
+        // Disable socket idle timeout now that we're connected. The timeout is only
+        // needed during initial connection establishment; once connected, the pool's
+        // keep-alive pings and health checks manage connection liveness.
+        if (this.socket) {
+            this.socket.setTimeout(0);
+        }
+        
+        this.logger.info(`CONNECTED TO C-GATE ${this.type.toUpperCase()} PORT: ${this.host}:${this.port}`);
+
+        // Send initial commands for command connection
+        if (this.type === 'command') {
+            this._sendInitialCommands();
+        }
+
+        // Start keep-alive pings for event connection
+        if (this.type === 'event') {
+            this._startKeepAlive();
+        }
+
+        this.emit('connect');
+    }
+
+    _handleClose(hadError) {
+        this.connected = false;
+        this._stopKeepAlive();
+
+        if (this.socket) {
+            this.socket.removeAllListeners();
+            this.socket = null;
+        }
+
+        this.logger.warn(`${this.type.toUpperCase()} PORT DISCONNECTED${hadError ? ' with error' : ''}`);
+        this.isWritable = false;
+        this._resolveDrainWaiters(false);
+        this.emit('close', hadError);
+        
+        // Only self-reconnect if NOT managed by a connection pool.
+        // Pool-managed connections (poolIndex >= 0) are reconnected by the pool.
+        if (this.poolIndex < 0) {
+            this._scheduleReconnect();
+        }
+    }
+
+    _handleError(err) {
+        this.logger.error(`C-Gate ${this.type} Socket Error:`, { error: err });
+        this.connected = false;
+        this._stopKeepAlive();
+
+        if (this.socket && !this.socket.destroyed) {
+            this.socket.destroy();
+        }
+        this.socket = null;
+        this.isWritable = false;
+        this._resolveDrainWaiters(false);
+        
+        this.emit('error', err);
+    }
+
+    _handleData(data) {
+        this.lastActivity = Date.now(); // Update activity timestamp for pool health monitoring
+        // Emit raw data for processing by parent classes
+        this.emit('data', data);
+    }
+
+    _handleTimeout() {
+        this.logger.warn(`C-Gate ${this.type} socket timed out after ${this.connectionTimeout}ms`);
+        if (this.socket && !this.socket.destroyed) {
+            this.socket.destroy();
+        }
+    }
+
+    _handleDrain() {
+        this.isWritable = true;
+        this._resolveDrainWaiters(true);
+        this.emit('writable', { poolIndex: this.poolIndex });
+    }
+
+    _waitForDrain(timeoutMs = this.connectionTimeout) {
+        if (this.isWritable) {
+            return Promise.resolve(true);
+        }
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                this._drainWaiters = this._drainWaiters.filter(waiter => waiter !== waiterRef);
+                resolve(false);
+            }, timeoutMs);
+
+            const waiterRef = {
+                resolve: (value) => {
+                    clearTimeout(timeout);
+                    resolve(value);
+                }
+            };
+            this._drainWaiters.push(waiterRef);
+        });
+    }
+
+    _resolveDrainWaiters(value) {
+        if (this._drainWaiters.length === 0) return;
+        const waiters = this._drainWaiters.splice(0, this._drainWaiters.length);
+        for (const waiter of waiters) {
+            waiter.resolve(value);
+        }
+    }
+
+    _sendInitialCommands() {
+        try {
+            if (this.socket && !this.socket.destroyed) {
+                // 1. Enable events
+                const eventCmd = CGATE_CMD_EVENT_ON + NEWLINE;
+                this.socket.write(eventCmd);
+                this.logger.info(`C-Gate Sent: ${CGATE_CMD_EVENT_ON}`);
+                
+                // 2. Send LOGIN if credentials provided
+                const user = this.settings.cgateusername;
+                const pass = this.settings.cgatepassword;
+                if (user && typeof user === 'string' && user.trim() !== '' && typeof pass === 'string') {
+                    const loginCmd = `${CGATE_CMD_LOGIN} ${user.trim()} ${pass}${NEWLINE}`;
+                    this.logger.info(`Sending LOGIN command for user '${user.trim()}'...`);
+                    this.socket.write(loginCmd);
+                }
+            } else {
+                this.logger.warn(`Command socket not available to send initial commands (EVENT ON / LOGIN).`);
+            }
+        } catch (e) {
+            this.logger.error(`Error sending initial commands (EVENT ON / LOGIN):`, { error: e });
+            this._handleError(e);
+        }
+    }
+
+    _scheduleReconnect() {
+        if (this.reconnectTimeout) {
+            return; // Already scheduled
+        }
+
+        // Exponential backoff, capped at reconnectMaxDelay -- never permanently give up
+        const delay = backoffDelay(this.reconnectAttempts, {
+            initialMs: this.reconnectInitialDelay,
+            maxMs: this.reconnectMaxDelay
+        });
+
+        this.reconnectAttempts++;
+        
+        if (this.reconnectAttempts <= this.maxReconnectAttempts) {
+            this.logger.info(`Scheduling ${this.type} reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+        } else {
+            this.logger.warn(`${this.type} connection exceeded initial retries, continuing with ${delay}ms backoff (attempt ${this.reconnectAttempts})`);
+        }
+
+        this.reconnectTimeout = setTimeout(() => {
+            this.reconnectTimeout = null;
+            this.connect();
+        }, delay).unref();
+    }
+
+    _startKeepAlive() {
+        if (!this.keepAliveInterval) return;
+
+        this._stopKeepAlive();
+
+        this.keepAliveTimer = setInterval(() => {
+            this._sendKeepAlive();
+        }, this.keepAliveInterval).unref();
+
+        this.logger.debug(`Event keep-alive started: pinging every ${this.keepAliveInterval}ms`);
+    }
+
+    _stopKeepAlive() {
+        if (this.keepAliveTimer) {
+            clearInterval(this.keepAliveTimer);
+            this.keepAliveTimer = null;
+        }
+    }
+
+    _sendKeepAlive() {
+        if (!this.connected || !this.socket || this.socket.destroyed) {
+            this.logger.warn('Event keep-alive: not connected, skipping ping and scheduling reconnect');
+            this._stopKeepAlive();
+            if (!this.isDestroyed && this.poolIndex < 0) {
+                this._scheduleReconnect();
+            }
+            return;
+        }
+
+        try {
+            this.socket.write(`# Keep-alive ${Date.now()}${NEWLINE}`);
+            this.lastActivity = Date.now();
+            this.logger.debug('Event keep-alive ping sent');
+        } catch (error) {
+            this.logger.error('Event keep-alive ping failed:', { error });
+            this._stopKeepAlive();
+            this._handleError(error);
+        }
+    }
+
+    // Logging methods that can be overridden
+}
+
+module.exports = CgateConnection;

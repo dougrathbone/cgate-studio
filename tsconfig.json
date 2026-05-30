@@ -9,6 +9,7 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "types": ["node", "jest"],
     "outDir": "dist"
   },
   "include": ["src", "tests"]
