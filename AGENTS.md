@@ -1,0 +1,44 @@
+# AGENTS.md — CBus Studio
+
+Guidance for AI agents (and humans) working in this repo.
+
+## What this project is
+
+An Electron desktop app (macOS-first, cross-platform bonus) that connects to an
+**existing C-Gate** server over TCP and lets C-Bus owners **browse, test, and
+organize** their network without a Windows machine running C-Bus Toolkit.
+Open-source community tool. **Not** a Toolkit clone — no unit programming.
+
+## Start here
+
+1. Read [`docs/context/session-starter.md`](docs/context/session-starter.md) — the decisions log.
+2. Read the design spec: [`docs/specs/2026-05-30-cbus-studio-design.md`](docs/specs/2026-05-30-cbus-studio-design.md).
+3. Read the implementation plan in `docs/plans/` before writing code.
+4. To reuse the C-Gate client, follow [`docs/context/vendoring-cgate-client.md`](docs/context/vendoring-cgate-client.md).
+
+## Hard constraints (decided during brainstorming)
+
+- **CNI / Ethernet only** — pure TCP. Do not add serial/USB PCI support.
+- **Connect to an existing C-Gate** — do not bundle C-Gate/JRE in the MVP.
+- **No MQTT / Home Assistant** — that is `cgateweb`'s domain.
+- **No unit programming** (Tier 3) — out of scope.
+- **Tag DB editing is rename-only** in v1; the only milestone that writes to the project DB.
+- **Security:** renderer never opens sockets. All C-Gate I/O lives in the Electron
+  main process behind `CgateService`. Use `contextIsolation: true`, a `preload`
+  bridge, and no `nodeIntegration` in the renderer.
+
+## Milestones
+
+- **M1** Connect & Browse (read-only): `TREEXML` → tree + live state from event stream.
+- **M2** Commission/Test: switch / ramp / terminate-ramp (transient, no DB writes).
+- **M3** Organize: rename labels + `PROJECT SAVE` (gated, confirm-on-save).
+
+## Conventions
+
+- Build M1 → M2 → M3 in order (risk-ordered; DB writes last).
+- Test against a **mock C-Gate** (fake TCP server with canned fixtures); CI must not need real hardware.
+- Keep the vendored `src/cgate-client/` close to upstream `cgateweb` until Phase B extraction.
+
+## Related repo
+
+- `cgateweb` (sibling): `/Users/doug/Documents/Code/cgateweb` — source of the vendored C-Gate client.
