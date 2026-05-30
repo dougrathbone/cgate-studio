@@ -1,0 +1,3 @@
+343-Begin XML snippet
+343-<Network><NetworkNumber>254</NetworkNumber><Unit><Application><ApplicationAddress>56</ApplicationAddress><Group><GroupAddress>4</GroupAddress><Label>Kitchen</Label></Group><Group><GroupAddress>5</GroupAddress><Label>Hallway</Label></Group></Application></Unit></Network>
+344 End XML snippet.
