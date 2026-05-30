@@ -2,7 +2,7 @@
   "name": "cbus-studio",
   "version": "1.0.0",
   "description": "A cross-platform (macOS-first) desktop app to **browse, organize, and test** a Clipsal C-Bus network — without needing a Windows machine running C-Bus Toolkit.",
-  "main": "index.js",
+  "main": "out/main/index.js",
   "directories": {
     "doc": "docs"
   },
@@ -25,6 +25,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
     "electron": "^42.3.0",
     "electron-vite": "^5.0.0",
     "jest": "^29.7.0",
