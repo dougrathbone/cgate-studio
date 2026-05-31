@@ -24,6 +24,8 @@ const CH = {
   sitesAdd: 'sites:add',
   sitesUpdate: 'sites:update',
   sitesRemove: 'sites:remove',
+  sitesLabelsGet: 'sites:labels:get',
+  sitesLabelsSave: 'sites:labels:save',
   setLevel: 'control:setLevel',
   terminateRamp: 'control:terminateRamp',
   rename: 'labels:rename',
@@ -53,6 +55,10 @@ contextBridge.exposeInMainWorld('cgate', {
     add: (input: SiteInput): Promise<Site[]> => ipcRenderer.invoke(CH.sitesAdd, input),
     update: (site: Site): Promise<Site[]> => ipcRenderer.invoke(CH.sitesUpdate, site),
     remove: (id: string): Promise<Site[]> => ipcRenderer.invoke(CH.sitesRemove, id),
+    getImportedLabels: (siteId: string | null): Promise<LabelImport | null> =>
+      ipcRenderer.invoke(CH.sitesLabelsGet, siteId),
+    saveImportedLabels: (siteId: string | null, labels: LabelImport): Promise<void> =>
+      ipcRenderer.invoke(CH.sitesLabelsSave, siteId, labels),
   },
   control: {
     setLevel: (ref: GroupRef, level: number, rampSecs?: number): Promise<CommandResult> =>

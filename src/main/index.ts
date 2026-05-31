@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron';
 import path from 'path';
 import { registerIpc } from './ipc';
 import { SiteStore } from './SiteStore';
+import { LabelStore } from './LabelStore';
 
 const APP_NAME = 'CBus Studio';
 
@@ -56,7 +57,8 @@ app.whenReady().then(() => {
   app.setAboutPanelOptions({ applicationName: APP_NAME });
   buildAppMenu();
   const siteStore = new SiteStore(path.join(app.getPath('userData'), 'sites.json'));
-  registerIpc(() => win, siteStore);
+  const labelStore = new LabelStore(path.join(app.getPath('userData'), 'labels.json'));
+  registerIpc(() => win, siteStore, labelStore);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

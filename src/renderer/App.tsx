@@ -160,9 +160,13 @@ export function App() {
     try {
       const imp = await cgate().project.import();
       if (!imp) return; // user cancelled the file picker
+      await cgate().sites.saveImportedLabels(activeSiteId, imp);
       setImported(imp);
-      setTree((prev) => applyImportedLabels(prev, imp));
-      setNotice(`Imported ${imp.stats.labelCount} label${imp.stats.labelCount === 1 ? '' : 's'} from ${imp.source}.`);
+      setTree((prev) => (prev.length ? applyImportedLabels(prev, imp) : prev));
+      const scope = activeSiteId ? 'this site' : 'all sites';
+      setNotice(
+        `Imported ${imp.stats.labelCount} label${imp.stats.labelCount === 1 ? '' : 's'} from ${imp.source} (saved for ${scope}).`,
+      );
     } catch (e) {
       setError(errMsg(e));
     }
@@ -194,6 +198,11 @@ export function App() {
 
   useEffect(() => {
     cgate().sites.list().then(setSites);
+    // Restore a global label import from the last session (site-specific imports
+    // are loaded when that site is connected).
+    cgate().sites.getImportedLabels(null).then((imp) => {
+      if (imp) setImported(imp);
+    });
     const offStatus = cgate().onStatus(setStatus);
     const offState = cgate().onState((s) =>
       setStates((prev) => ({ ...prev, [s.address]: s })));
@@ -218,6 +227,8 @@ export function App() {
     setProjectName(null);
     setDirty(new Set());
     setConfirmSave(false);
+    const imp = await cgate().sites.getImportedLabels(site.id);
+    setImported(imp);
     try {
       await cgate().connect({
         host: site.host,
@@ -226,7 +237,7 @@ export function App() {
       });
       cgate().project.name().then(setProjectName).catch(() => {});
       const t = await cgate().getTree('254');
-      const display = imported ? applyImportedLabels(t, imported) : t;
+      const display = imp ? applyImportedLabels(t, imp) : t;
       setTree(display);
       if (enrichGen.current === gen) {
         void enrichTree(collectGroups(display), gen);

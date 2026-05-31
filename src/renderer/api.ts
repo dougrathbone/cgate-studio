@@ -18,6 +18,8 @@ interface SitesApi {
   add(input: SiteInput): Promise<Site[]>;
   update(site: Site): Promise<Site[]>;
   remove(id: string): Promise<Site[]>;
+  getImportedLabels(siteId: string | null): Promise<LabelImport | null>;
+  saveImportedLabels(siteId: string | null, labels: LabelImport): Promise<void>;
 }
 
 interface ControlApi {

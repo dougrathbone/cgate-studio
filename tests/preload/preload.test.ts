@@ -59,10 +59,14 @@ describe('preload bridge', () => {
     await api.sites.add(input);
     await api.sites.update({ id: 'x', ...input });
     await api.sites.remove('x');
+    await api.sites.getImportedLabels('site-1');
+    await api.sites.saveImportedLabels('site-1', { source: 'a.cbz', networks: {}, applications: {}, groups: {}, stats: { networkCount: 0, groupCount: 0, labelCount: 0 } });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:list');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:add', input);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:update', { id: 'x', ...input });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:remove', 'x');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:labels:get', 'site-1');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:labels:save', 'site-1', expect.any(Object));
   });
 
   it('exposes control, labels, and project APIs mapped to their IPC channels', async () => {

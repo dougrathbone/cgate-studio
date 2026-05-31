@@ -1,6 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { CgateService } from './CgateService';
 import { SiteStore } from './SiteStore';
+import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
 import { exportLabelsToFile } from './projectExport';
 import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult } from '../shared/types';
@@ -15,6 +16,8 @@ export const CHANNELS = {
   sitesAdd: 'sites:add',
   sitesUpdate: 'sites:update',
   sitesRemove: 'sites:remove',
+  sitesLabelsGet: 'sites:labels:get',
+  sitesLabelsSave: 'sites:labels:save',
   setLevel: 'control:setLevel',         // M2: switch / ramp
   terminateRamp: 'control:terminateRamp',
   rename: 'labels:rename',              // M3: set group Name
@@ -46,6 +49,7 @@ const saveDialogOptions = {
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
   siteStore: SiteStore,
+  labelStore: LabelStore,
 ): CgateService {
   const svc = new CgateService();
 
@@ -59,7 +63,15 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.sitesList, () => siteStore.list());
   ipcMain.handle(CHANNELS.sitesAdd, (_e, input: SiteInput) => siteStore.add(input));
   ipcMain.handle(CHANNELS.sitesUpdate, (_e, site: Site) => siteStore.update(site));
-  ipcMain.handle(CHANNELS.sitesRemove, (_e, id: string) => siteStore.remove(id));
+  ipcMain.handle(CHANNELS.sitesRemove, (_e, id: string) => {
+    labelStore.remove(id);
+    return siteStore.remove(id);
+  });
+
+  ipcMain.handle(CHANNELS.sitesLabelsGet, (_e, siteId: string | null) => labelStore.get(siteId));
+  ipcMain.handle(CHANNELS.sitesLabelsSave, (_e, siteId: string | null, labels: LabelImport) => {
+    labelStore.save(siteId, labels);
+  });
 
   ipcMain.handle(CHANNELS.setLevel, (_e, ref: GroupRef, level: number, rampSecs?: number) =>
     svc.setLevel(ref, level, rampSecs));

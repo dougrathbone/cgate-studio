@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { App } from '../../src/renderer/App';
-import type { Site, Tree } from '../../src/shared/types';
+import type { Site, Tree, LabelImport } from '../../src/shared/types';
 
 const sampleTree: Tree = [
   {
@@ -38,6 +38,8 @@ const homeSite: Site = { id: 'a', name: 'Home', host: '10.0.0.1', commandPort: 2
 function installApi(initialSites: Site[] = [homeSite]) {
   let statusCb: (s: any) => void = () => {};
   let stateCb: (s: any) => void = () => {};
+  let persistedGlobal: LabelImport | null = null;
+  const persistedBySite: Record<string, LabelImport> = {};
   const api = {
     connect: jest.fn().mockResolvedValue(undefined),
     disconnect: jest.fn().mockResolvedValue(undefined),
@@ -49,6 +51,14 @@ function installApi(initialSites: Site[] = [homeSite]) {
       add: jest.fn(),
       update: jest.fn(),
       remove: jest.fn().mockResolvedValue([]),
+      getImportedLabels: jest.fn(async (siteId: string | null) => {
+        if (siteId && persistedBySite[siteId]) return persistedBySite[siteId];
+        return persistedGlobal;
+      }),
+      saveImportedLabels: jest.fn(async (siteId: string | null, labels: LabelImport) => {
+        if (siteId) persistedBySite[siteId] = labels;
+        else persistedGlobal = labels;
+      }),
     },
     control: {
       setLevel: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
@@ -206,10 +216,14 @@ describe('App', () => {
     await act(async () => { fireEvent.click(screen.getByText('Import labels')); });
 
     expect(api.project.import).toHaveBeenCalled();
+    expect(api.sites.saveImportedLabels).toHaveBeenCalledWith('a', expect.objectContaining({
+      groups: { '254/56/4': 'Master Bedroom' },
+    }));
     // Imported label overrides the live one, and a notice is shown.
     expect(await screen.findByText('Master Bedroom')).toBeInTheDocument();
     expect(screen.queryByText('Kitchen')).not.toBeInTheDocument();
     expect(screen.getByText(/Imported 1 label from home\.cbz/)).toBeInTheDocument();
+    expect(screen.getByText(/saved for this site/)).toBeInTheDocument();
   });
 
   it('enriches groups with labels and levels fetched after the initial load', async () => {
@@ -340,7 +354,14 @@ describe('App', () => {
       getTree: jest.fn().mockResolvedValue([]),
       onStatus: jest.fn(() => offStatus),
       onState: jest.fn(() => offState),
-      sites: { list: jest.fn().mockResolvedValue([]), add: jest.fn(), update: jest.fn(), remove: jest.fn() },
+      sites: {
+        list: jest.fn().mockResolvedValue([]),
+        add: jest.fn(),
+        update: jest.fn(),
+        remove: jest.fn(),
+        getImportedLabels: jest.fn().mockResolvedValue(null),
+        saveImportedLabels: jest.fn().mockResolvedValue(undefined),
+      },
     };
     const { unmount } = render(<App />);
     unmount();
