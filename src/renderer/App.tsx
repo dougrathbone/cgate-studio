@@ -7,6 +7,7 @@ import { CgateStatusPanel } from './components/CgateStatusPanel';
 import { EntityPanel } from './components/EntityPanel';
 import type { GroupActions } from './components/GroupRow';
 import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection } from '../shared/types';
+import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
 const refOf = (g: GroupNode) => ({ network: g.network, application: g.application, group: g.group });
@@ -96,10 +97,11 @@ export function App() {
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
 
-  // Monotonic token: each (re)connect bumps it so enrichment from a stale
-  // connection can't apply onto a newer tree. Refs let the async enrichment
-  // closure read the latest dirty/imported state without re-binding.
+  // Monotonic tokens: each (re)connect bumps them so stale connect/getTree work
+  // and enrichment can't apply onto a newer session.
+  const connectGen = useRef(0);
   const enrichGen = useRef(0);
+  const [connectBusy, setConnectBusy] = useState(false);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   const importedRef = useRef(imported);
@@ -263,7 +265,9 @@ export function App() {
   }
 
   async function connectSite(site: Site) {
-    const gen = ++enrichGen.current; // invalidate any in-flight enrichment
+    const gen = ++connectGen.current;
+    const enrichGenForTree = ++enrichGen.current;
+    setConnectBusy(true);
     setActiveSiteId(site.id);
     setStates({});
     setTree([]);
@@ -273,6 +277,7 @@ export function App() {
     setConfirmSave(false);
     setSelection(null);
     const imp = await cgate().sites.getImportedLabels(site.id);
+    if (connectGen.current !== gen) return;
     setImported(imp);
     try {
       await cgate().connect({
@@ -280,17 +285,25 @@ export function App() {
         commandPort: site.commandPort,
         eventPort: site.eventPort,
       });
-      cgate().project.name().then(setProjectName).catch(() => {});
+      if (connectGen.current !== gen) return;
       const t = await cgate().getTree('254');
+      if (connectGen.current !== gen) return;
       const display = imp ? applyImportedLabels(t, imp) : t;
       setTree(display);
-      if (enrichGen.current === gen) {
-        void enrichTree(collectGroups(display), gen);
+      if (enrichGen.current === enrichGenForTree) {
+        void enrichTree(collectGroups(display), enrichGenForTree);
       }
+      cgate().project.name().then((name) => {
+        if (connectGen.current === gen) setProjectName(name);
+      }).catch(() => {});
     } catch (e) {
-      // Surface connect/getTree failures in the UI instead of letting them
-      // bubble up as an unhandled promise rejection.
-      setError(e instanceof Error ? e.message : String(e));
+      if (connectGen.current !== gen) return;
+      const msg = e instanceof Error ? e.message : String(e);
+      // A newer connect() tore this one down; don't show a scary error for that.
+      if (msg === CONNECTION_SUPERSEDED || msg === 'Disconnected during getTree') return;
+      setError(msg);
+    } finally {
+      if (connectGen.current === gen) setConnectBusy(false);
     }
   }
 
@@ -378,6 +391,7 @@ export function App() {
               sites={sites}
               activeId={activeSiteId}
               activeStatus={status}
+              connectDisabled={connectBusy || status === 'connecting'}
               onConnect={connectSite}
               onRemove={removeSite}
             />

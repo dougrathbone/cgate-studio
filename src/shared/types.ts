@@ -68,6 +68,9 @@ export interface GroupState {
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
+/** Main-process connect() was replaced by a newer connect/disconnect. */
+export const CONNECTION_SUPERSEDED = 'Connection superseded';
+
 // Identifies a single group on the network, used to address control / rename
 // commands (built into a C-Gate path like "//PROJECT/254/56/4").
 export interface GroupRef {

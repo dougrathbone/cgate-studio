@@ -9,6 +9,7 @@ import type {
   CommandResult,
   GroupDetail,
 } from '../shared/types';
+import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateObjectParams } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 import {
@@ -72,6 +73,8 @@ export class CgateService extends EventEmitter {
   private rampTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private serverGreeting: string | null = null;
   private connectOpts: Pick<ConnectOptions, 'host' | 'commandPort' | 'eventPort'> | null = null;
+  // Bumped on each connect()/disconnect() so overlapping connects can abort cleanly.
+  private connectGeneration = 0;
 
   private setStatus(s: ConnectionStatus) {
     this.status = s;
@@ -87,15 +90,37 @@ export class CgateService extends EventEmitter {
     if (this.listenerCount('error') > 0) this.emit('error', e);
   }
 
-  async connect(opts: ConnectOptions): Promise<void> {
-    // Re-connect safety: the Connect action stays enabled, so connect() can be
-    // called again on an already-connected service. Tear down the prior pair
-    // first (destroys sockets, removes listeners, clears self-reconnect, nulls
-    // them, settles any in-flight getTree) so we never orphan the old event
-    // connection (double 'state' emits) or leak the old command socket.
-    if (this.command || this.event) {
-      await this.disconnect();
+  // Tear down sockets and settle/clear the command channel without flipping to
+  // 'disconnected' (used when replacing a connection during connect()).
+  private teardownConnections(): void {
+    for (const cancel of [...this.pendingCommands]) cancel();
+    this.pendingCommands.clear();
+    this.commandQueue = [];
+    this.commandBusy = false;
+    this.commandConsumer = null;
+    this.clearRampTimers();
+    this.command?.disconnect();
+    this.event?.disconnect();
+    this.command = null;
+    this.event = null;
+    this.commandBuf = '';
+    this.eventBuf = '';
+    this.serverGreeting = null;
+  }
+
+  private assertConnectGeneration(gen: number): void {
+    if (this.connectGeneration !== gen) {
+      throw new Error(CONNECTION_SUPERSEDED);
     }
+  }
+
+  async connect(opts: ConnectOptions): Promise<void> {
+    // Re-connect safety: Connect/Reconnect can be clicked again while a prior
+    // connect or getTree is still running. Serialize via connectGeneration and
+    // tear down the prior pair without a disconnected status flash.
+    const gen = ++this.connectGeneration;
+    this.teardownConnections();
+    this.assertConnectGeneration(gen);
     this.setStatus('connecting');
     // Prefer an explicitly configured project; otherwise discover it lazily.
     this.projectName = opts.project ?? null;
@@ -126,7 +151,9 @@ export class CgateService extends EventEmitter {
         this.waitForConnect(this.command),
         this.waitForConnect(this.event),
       ]);
+      this.assertConnectGeneration(gen);
     } catch (e) {
+      if (e instanceof Error && e.message === CONNECTION_SUPERSEDED) throw e;
       // Partial-connect failure: tear down BOTH connections so the side that
       // did connect isn't orphaned and the failed side doesn't self-reconnect
       // (poolIndex < 0). Leave a definitive status, then rethrow (I4).
@@ -141,6 +168,7 @@ export class CgateService extends EventEmitter {
     // before allowing commands, so those unsolicited responses can't be
     // mistaken for the reply to the first command we send.
     await this.drainHandshake();
+    this.assertConnectGeneration(gen);
     this.setStatus('connected');
   }
 
@@ -503,22 +531,10 @@ export class CgateService extends EventEmitter {
   }
 
   async disconnect(): Promise<void> {
-    // Settle any in-flight command-channel op (getTree / sendCommand) first so
-    // callers don't hang and no timer/listener leaks once the connection is
-    // gone (I3).
-    for (const cancel of [...this.pendingCommands]) cancel();
-    this.pendingCommands.clear();
-    this.clearRampTimers();
-    this.command?.disconnect();
-    this.event?.disconnect();
-    this.command = null;
-    this.event = null;
+    this.connectGeneration++;
+    this.teardownConnections();
     this.projectName = null;
     this.connectOpts = null;
-    this.serverGreeting = null;
-    this.commandConsumer = null;
-    this.commandBuf = '';
-    this.eventBuf = '';
     this.setStatus('disconnected');
   }
 

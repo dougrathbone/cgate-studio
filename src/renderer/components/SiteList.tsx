@@ -13,12 +13,14 @@ export function SiteList({
   sites,
   activeId,
   activeStatus,
+  connectDisabled,
   onConnect,
   onRemove,
 }: {
   sites: Site[];
   activeId: string | null;
   activeStatus?: ConnectionStatus;
+  connectDisabled?: boolean;
   onConnect: (s: Site) => void;
   onRemove: (id: string) => void;
 }) {
@@ -46,8 +48,12 @@ export function SiteList({
                 {s.host}:{s.commandPort}/{s.eventPort}
               </small>
             </span>
-            <button className="btn btn--sm btn--primary" onClick={() => onConnect(s)}>
-              {active ? 'Reconnect' : 'Connect'}
+            <button
+              className="btn btn--sm btn--primary"
+              disabled={connectDisabled}
+              onClick={() => onConnect(s)}
+            >
+              {active && connectDisabled ? 'Connecting…' : active ? 'Reconnect' : 'Connect'}
             </button>
             <button
               className="btn btn--danger btn--icon"

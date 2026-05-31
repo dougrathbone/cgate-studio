@@ -317,4 +317,5 @@ describe('CgateService', () => {
       svc.off('state', collect);
     }
   });
+
 });

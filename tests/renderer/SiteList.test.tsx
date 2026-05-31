@@ -37,4 +37,13 @@ describe('SiteList', () => {
     expect(screen.getByText('Reconnect')).toBeInTheDocument();
     expect(screen.getByText('Connect')).toBeInTheDocument(); // the non-active one
   });
+
+  it('disables connect while connectDisabled and shows Connecting… on the active site', () => {
+    render(
+      <SiteList sites={sites} activeId="a" connectDisabled onConnect={jest.fn()} onRemove={jest.fn()} />,
+    );
+    expect(screen.getByText('Connecting…')).toBeDisabled();
+    // connectDisabled applies to every site while a connect is in flight.
+    expect(screen.getByText('Connect')).toBeDisabled();
+  });
 });
