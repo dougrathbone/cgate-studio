@@ -268,9 +268,12 @@ export class CgateService extends EventEmitter {
       };
 
       // Collect response lines until a terminal one ("CODE "); continuation
-      // lines ("CODE-") accumulate first.
+      // lines ("CODE-") accumulate first. List commands (PROJECT LIST/DIR) emit
+      // multiple "123 project=..." lines before the final status.
+      const isListItem = (line: string) => /^12[34]\s/i.test(line) && /project=/i.test(line);
       const consume = (line: string) => {
         lines.push(line);
+        if (isListItem(line)) return;
         if (!CMD_TERMINAL.test(line)) return;
         const code = parseInt(line.slice(0, 3), 10);
         const text = line.slice(4);

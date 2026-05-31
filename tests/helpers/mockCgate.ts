@@ -40,7 +40,10 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           socket.write(fixture.endsWith('\n') ? fixture : fixture + '\n');
         } else if (/^PROJECT LIST/i.test(line)) {
           commands.push(line);
-          socket.write('123 project=TESTPROJ state=started\r\n');
+          socket.write('123 project=TESTPROJ state=started\r\n200 OK.\r\n');
+        } else if (/^PROJECT DIR/i.test(line)) {
+          commands.push(line);
+          socket.write('123 project=TESTPROJ\r\n123 project=ARCHIVE\r\n200 OK.\r\n');
         } else if (/^DBGET /i.test(line)) {
           commands.push(line);
           const objPath = line.split(/\s+/)[1] ?? '';
