@@ -29,6 +29,7 @@ const sampleTree: Tree = [
         ],
       },
     ],
+    units: [],
   },
 ];
 
@@ -121,6 +122,15 @@ describe('App', () => {
     // ...then delete it; the active selection should clear (button reverts).
     await act(async () => { fireEvent.click(screen.getByLabelText('Delete Home')); });
     expect(api.sites.remove).toHaveBeenCalledWith('a');
+  });
+
+  it('surfaces a connect/getTree failure as an error instead of crashing', async () => {
+    const { api } = installApi();
+    (api.connect as jest.Mock).mockRejectedValue(new Error('TREEXML timed out'));
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    expect(await screen.findByText(/TREEXML timed out/)).toBeInTheDocument();
   });
 
   it('unsubscribes from bridge events on unmount', () => {

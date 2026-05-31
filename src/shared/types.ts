@@ -32,8 +32,21 @@ export interface GroupNode {
 export interface AppNode {
   kind: 'application';
   address: string;        // application id, e.g. "56"
-  label: string | null;
+  label: string | null;   // resolved name, e.g. "Lighting", when known
   groups: GroupNode[];
+}
+
+// A physical device on the network (a C-Bus "unit"), as reported by TREEXML.
+export interface UnitNode {
+  kind: 'unit';
+  address: string;            // unit address on the network, e.g. "12"
+  name: string | null;        // the unit's tag/part name, e.g. "KITCHEN"
+  type: string | null;        // model/catalogue, e.g. "DIMDC8", "RELDN12"
+  category: string | null;    // friendly device class, e.g. "Dimmer", "Relay"
+  firmware: string | null;    // firmware version
+  serial: string | null;      // serial number
+  applications: string[];     // application addresses the unit participates in
+  groups: string[];           // group addresses the unit drives/monitors
 }
 
 export interface NetworkNode {
@@ -41,6 +54,7 @@ export interface NetworkNode {
   address: string;        // "254"
   label: string | null;
   applications: AppNode[];
+  units: UnitNode[];
 }
 
 export type Tree = NetworkNode[];

@@ -1,9 +1,12 @@
 import { EventEmitter } from 'events';
 import type { ConnectOptions, Tree, GroupState, ConnectionStatus } from '../shared/types';
 
-const CgateConnection = require('../cgate-client/cgateConnection');
-const CBusEvent = require('../cgate-client/cbusEvent');
-const { parseTreeXml } = require('../cgate-client/treexml');
+// Use ES imports (not require) so the bundler inlines the vendored client into
+// the main-process bundle; otherwise the relative requires resolve against
+// out/main/ at runtime and fail (Electron: "Cannot find module ...").
+import CgateConnection from '../cgate-client/cgateConnection';
+import CBusEvent from '../cgate-client/cbusEvent';
+import { parseTreeXml } from '../cgate-client/treexml';
 
 const TREE_START = /^343/m;
 const TREE_END = /^344[ \t]/m;
@@ -109,16 +112,23 @@ export class CgateService extends EventEmitter {
       let timer: ReturnType<typeof setTimeout>;
 
       const onData = (buf: Buffer) => {
-        // TODO(M1-followup): M6 — decode with StringDecoder so multibyte chars
-        // split across socket chunks aren't corrupted by per-chunk toString().
-        raw += buf.toString();
-        if (!TREE_END.test(raw)) return;
-        const startMatch = raw.match(TREE_START);
-        const frame = startMatch ? raw.slice(startMatch.index) : raw;
-        parseTreeXml(frame, network).then(
-          (tree: Tree) => settle(() => resolve(tree)),
-          (err: Error) => settle(() => reject(err)),
-        );
+        // Guard the whole handler: it runs on a socket 'data' event, so any
+        // synchronous throw here would escape as an uncaught exception and crash
+        // the main process. Convert failures into a rejection instead.
+        try {
+          // TODO(M1-followup): M6 — decode with StringDecoder so multibyte chars
+          // split across socket chunks aren't corrupted by per-chunk toString().
+          raw += buf.toString();
+          if (!TREE_END.test(raw)) return;
+          const startMatch = raw.match(TREE_START);
+          const frame = startMatch ? raw.slice(startMatch.index) : raw;
+          parseTreeXml(frame, network).then(
+            (tree) => settle(() => resolve(tree as Tree)),
+            (err: Error) => settle(() => reject(err)),
+          );
+        } catch (e) {
+          settle(() => reject(e as Error));
+        }
       };
 
       const settle = (apply: () => void) => {
@@ -144,15 +154,22 @@ export class CgateService extends EventEmitter {
   private handleEventData(buf: Buffer) {
     for (const line of buf.toString().split(/\r?\n/)) {
       if (!line.trim()) continue;
-      const evt = new CBusEvent(line);
-      if (!evt.isValid()) continue;
-      const level = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
-      const state: GroupState = {
-        address: `${evt.getNetwork()}/${evt.getApplication()}/${evt.getGroup()}`,
-        level,
-        on: level > 0,
-      };
-      this.emit('state', state);
+      // Parse/emit per line under a guard: this runs on a socket 'data' event,
+      // so a single malformed line (or a throwing 'state' listener) must not
+      // escape as an uncaught exception and crash the main process.
+      try {
+        const evt = new CBusEvent(line);
+        if (!evt.isValid()) continue;
+        const level = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
+        const state: GroupState = {
+          address: `${evt.getNetwork()}/${evt.getApplication()}/${evt.getGroup()}`,
+          level,
+          on: level > 0,
+        };
+        this.emit('state', state);
+      } catch {
+        // Ignore an individual bad event line and keep processing the rest.
+      }
     }
   }
 
