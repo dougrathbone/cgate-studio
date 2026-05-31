@@ -1,22 +1,58 @@
 name: Release
 
+# Automated semantic-versioning releases driven by Conventional Commits.
+#
+# How it works:
+#   1. release-please watches `main`. As `feat:` / `fix:` / etc. commits land it
+#      maintains a single "release PR" that bumps the version in package.json
+#      (semver: feat -> minor, fix -> patch, `!`/BREAKING CHANGE -> major) and
+#      regenerates CHANGELOG.md.
+#   2. Merging that PR tags the commit `vX.Y.Z` and publishes a GitHub Release.
+#   3. We then build the macOS and Windows installers on their native runners and
+#      attach them to that release, so people can download a real installer.
+#
+# Manual runs (workflow_dispatch) build installers as artifacts only — handy for
+# smoke-testing a packaged build without cutting a release.
+#
+# Note: the installer build lives in this same workflow (gated on
+# `release_created`) on purpose. A tag pushed by release-please uses the default
+# GITHUB_TOKEN, which by design does NOT re-trigger tag/`release`-triggered
+# workflows — so a separate tag-triggered workflow would never fire.
+
 on:
-  # Build + publish installers when a version tag is pushed, e.g. v1.0.0.
   push:
-    tags: ['v*']
-  # Allow building installers on demand (artifacts only, no Release).
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  release-please:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   installers:
     name: Installer (${{ matrix.platform }})
+    needs: release-please
+    # Build on a fresh release, or on demand via "Run workflow".
+    if: ${{ needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,7 +79,8 @@ jobs:
       - name: Build installer
         run: npm run dist:${{ matrix.platform }}
         env:
-          # No Apple Developer cert in CI — build unsigned instead of failing.
+          # No Apple Developer / Windows code-signing cert in CI — build unsigned
+          # instead of failing.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload installer artifacts
@@ -57,10 +94,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Attach installers to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Attach installers to the GitHub Release
+        if: ${{ needs.release-please.outputs.release_created == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: |
             release/*.dmg
             release/*.exe
