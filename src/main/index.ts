@@ -3,8 +3,7 @@ import path from 'path';
 import { registerIpc } from './ipc';
 import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
-
-const APP_NAME = 'CBus Studio';
+import { APP_NAME, buildAppMenuTemplate, configureAboutPanel } from './about';
 
 // Override the name Electron shows in the macOS menu bar, dock, and About panel.
 // Without this, an unpackaged/dev run reports the generic "Electron" name.
@@ -40,21 +39,11 @@ function createWindow() {
 }
 
 function buildAppMenu() {
-  const isMac = process.platform === 'darwin';
-  // The 'appMenu' role's bold first item is labelled from app.getName(), so the
-  // explicit setName above makes it read "CBus Studio" instead of "Electron".
-  const template: Electron.MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
-    { role: 'fileMenu' },
-    { role: 'editMenu' },
-    { role: 'viewMenu' },
-    { role: 'windowMenu' },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(buildAppMenuTemplate(() => win)));
 }
 
 app.whenReady().then(() => {
-  app.setAboutPanelOptions({ applicationName: APP_NAME });
+  configureAboutPanel();
   buildAppMenu();
   const siteStore = new SiteStore(path.join(app.getPath('userData'), 'sites.json'));
   const labelStore = new LabelStore(path.join(app.getPath('userData'), 'labels.json'));
