@@ -1,7 +1,19 @@
 # CBus Studio
 
-A cross-platform (macOS-first) desktop app to **browse, test, and organize** a
-Clipsal C-Bus network — without needing a Windows machine running C-Bus Toolkit.
+**Browse, test, and organize a Clipsal C-Bus network** — without needing a Windows
+machine running C-Bus Toolkit.
+
+<p align="center">
+  <a href="docs/images/cbus-studio.png">
+    <img
+      src="docs/images/cbus-studio.png"
+      alt="CBus Studio connected to a live C-Bus network — sites sidebar, collapsible device tree, and per-group on/off and dim controls"
+      width="920"
+    />
+  </a>
+</p>
+
+<p align="center"><sub>Saved sites · live device tree · per-group controls · import/export labels</sub></p>
 
 CBus Studio is an [Electron](https://www.electronjs.org/) app that talks to an
 existing **C-Gate** server over TCP (the same documented command/event interface
@@ -9,7 +21,16 @@ that C-Bus Toolkit drives under the hood) and gives C-Bus owners a native GUI fo
 their network. It is an open-source community tool and deliberately does **not**
 attempt Toolkit's proprietary unit-programming layer.
 
-![CBus Studio connected to a live C-Bus network — sites sidebar, device tree, and per-group live controls](docs/images/cbus-studio.png)
+## Download
+
+Pre-built installers for **macOS** (`.dmg`) and **Windows** (`.exe`) are attached
+to each [GitHub Release](../../releases/latest). Grab the latest one, install, and
+point it at your C-Gate server.
+
+Builds are currently **unsigned** (no Apple Developer / Windows code-signing
+certificate yet), so the OS will show the usual unidentified-developer warning on
+first launch — on macOS, right-click the app and choose **Open**; on Windows,
+choose **More info → Run anyway**.
 
 ## Why
 
@@ -135,12 +156,30 @@ npm run dist:win   # Windows NSIS .exe installer (built on Windows)
 npm run dist       # installer(s) for the current host platform
 ```
 
-Each platform's installer must be built on that platform. Pushing a `v*` tag (e.g.
-`v1.0.0`) runs the **Release** GitHub Actions workflow, which builds the macOS and
-Windows installers on their respective runners and attaches them to a GitHub
-Release. Builds are currently **unsigned** (no Apple Developer / Windows
-code-signing certificate yet), so the OS will show the usual unidentified-developer
-warning on first launch.
+Each platform's installer must be built on that platform — the **Release**
+GitHub Actions workflow does this on macOS and Windows runners and attaches the
+results to the GitHub Release (see *Versioning & releases* below). You can also
+trigger that workflow manually (**Actions → Release → Run workflow**) to produce
+installer artifacts without cutting a release.
+
+## Versioning & releases
+
+Releases follow [Semantic Versioning](https://semver.org/) and are automated with
+[release-please](https://github.com/googleapis/release-please) on top of
+[Conventional Commits](https://www.conventionalcommits.org/):
+
+- Commit to `main` using conventional prefixes — `feat:` (→ minor bump), `fix:`
+  (→ patch), and `feat!:` / `fix!:` / a `BREAKING CHANGE:` footer (→ major).
+- release-please opens and maintains a **release PR** that bumps the version in
+  `package.json` and updates [`CHANGELOG.md`](CHANGELOG.md). Review and merge it
+  when you're ready to ship.
+- Merging the release PR tags the commit `vX.Y.Z`, publishes a **GitHub Release**,
+  and kicks off the macOS + Windows installer builds, which are attached to that
+  release for download.
+
+No manual tagging, version bumping, or changelog editing is required; everything
+flows from the commit messages. The workflow uses the built-in `GITHUB_TOKEN`, so
+there are no extra secrets to configure.
 
 ## Architecture
 
