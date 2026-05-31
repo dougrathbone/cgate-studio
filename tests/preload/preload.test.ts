@@ -28,9 +28,11 @@ describe('preload bridge', () => {
     await api.connect(opts);
     await api.disconnect();
     await api.getTree('254');
+    await api.getServerStatus();
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('cgate:connect', opts);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('cgate:disconnect');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('cgate:getTree', '254');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('cgate:serverStatus');
   });
 
   it('onStatus subscribes, delivers values, and returns an unsubscribe', () => {

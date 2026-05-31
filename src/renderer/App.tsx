@@ -3,8 +3,10 @@ import { cgate } from './api';
 import { SiteForm } from './components/SiteForm';
 import { SiteList } from './components/SiteList';
 import { DeviceTree } from './components/DeviceTree';
+import { CgateStatusPanel } from './components/CgateStatusPanel';
 import type { GroupActions } from './components/GroupRow';
 import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport } from '../shared/types';
+import type { CgateServerStatus } from '../shared/cgateStatus';
 
 const refOf = (g: GroupNode) => ({ network: g.network, application: g.application, group: g.group });
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -88,6 +90,9 @@ export function App() {
   // Addresses whose label was renamed but not yet saved to the project DB.
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [confirmSave, setConfirmSave] = useState(false);
+  const [statusPanelOpen, setStatusPanelOpen] = useState(false);
+  const [serverStatus, setServerStatus] = useState<CgateServerStatus | null>(null);
+  const [serverStatusLoading, setServerStatusLoading] = useState(false);
 
   // Monotonic token: each (re)connect bumps it so enrichment from a stale
   // connection can't apply onto a newer tree. Refs let the async enrichment
@@ -196,6 +201,29 @@ export function App() {
       .catch((e) => { setError(errMsg(e)); setConfirmSave(false); });
   }
 
+  async function refreshServerStatus() {
+    if (status !== 'connected') {
+      setServerStatus(null);
+      return;
+    }
+    setServerStatusLoading(true);
+    try {
+      setServerStatus(await cgate().getServerStatus());
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setServerStatusLoading(false);
+    }
+  }
+
+  function toggleStatusPanel() {
+    setStatusPanelOpen((open) => {
+      const next = !open;
+      if (next) void refreshServerStatus();
+      return next;
+    });
+  }
+
   useEffect(() => {
     cgate().sites.list().then(setSites);
     // Restore a global label import from the last session (site-specific imports
@@ -208,6 +236,11 @@ export function App() {
       setStates((prev) => ({ ...prev, [s.address]: s })));
     return () => { offStatus(); offState(); };
   }, []);
+
+  useEffect(() => {
+    if (statusPanelOpen && status === 'connected') void refreshServerStatus();
+    if (status === 'disconnected') setServerStatus(null);
+  }, [status, statusPanelOpen]);
 
   async function addSite(input: SiteInput) {
     setSites(await cgate().sites.add(input));
@@ -278,13 +311,32 @@ export function App() {
           >
             Export labels
           </button>
-          <span
-            className="statusDot statusDot--lg"
-            role="img"
-            aria-label={status}
-            title={status}
-            style={{ background: STATUS_COLORS[status], color: STATUS_COLORS[status] }}
-          />
+          <div className="statusPanelWrap">
+            <button
+              type="button"
+              className="statusDotBtn"
+              onClick={toggleStatusPanel}
+              aria-expanded={statusPanelOpen}
+              aria-haspopup="dialog"
+              aria-label={`C-Gate status: ${status}`}
+              title={`C-Gate status: ${status} — click for details`}
+            >
+              <span
+                className="statusDot statusDot--lg"
+                role="img"
+                aria-hidden
+                style={{ background: STATUS_COLORS[status], color: STATUS_COLORS[status] }}
+              />
+            </button>
+            <CgateStatusPanel
+              open={statusPanelOpen}
+              connection={status}
+              server={serverStatus}
+              loading={serverStatusLoading}
+              onRefresh={refreshServerStatus}
+              onClose={() => setStatusPanelOpen(false)}
+            />
+          </div>
         </div>
       </header>
 

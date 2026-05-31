@@ -12,6 +12,7 @@ import type {
   LabelExportInput,
   LabelExportResult,
 } from '../shared/types';
+import type { CgateServerStatus } from '../shared/cgateStatus';
 
 interface SitesApi {
   list(): Promise<Site[]>;
@@ -46,6 +47,7 @@ interface CgateApi {
   connect(opts: ConnectOptions): Promise<void>;
   disconnect(): Promise<void>;
   getTree(network: string): Promise<Tree>;
+  getServerStatus(): Promise<CgateServerStatus>;
   onStatus(cb: (s: ConnectionStatus) => void): () => void;
   onState(cb: (s: GroupState) => void): () => void;
   sites: SitesApi;

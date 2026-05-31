@@ -44,6 +44,19 @@ function installApi(initialSites: Site[] = [homeSite]) {
     connect: jest.fn().mockResolvedValue(undefined),
     disconnect: jest.fn().mockResolvedValue(undefined),
     getTree: jest.fn().mockResolvedValue(sampleTree),
+    getServerStatus: jest.fn().mockResolvedValue({
+      connection: 'connected',
+      host: '10.0.0.1',
+      commandPort: 20023,
+      eventPort: 20025,
+      commandConnected: true,
+      eventConnected: true,
+      serverVersion: 'v2.8.0',
+      serverGreeting: null,
+      activeProject: { name: 'TESTPROJ', state: 'started' },
+      loadedProjects: [],
+      projectsOnDisk: [],
+    }),
     onStatus: jest.fn((cb: any) => { statusCb = cb; return jest.fn(); }),
     onState: jest.fn((cb: any) => { stateCb = cb; return jest.fn(); }),
     sites: {
@@ -91,9 +104,8 @@ describe('App', () => {
     expect(await screen.findByText('Home')).toBeInTheDocument();
     act(() => fireStatus('connected'));
     // Status renders as a colored dot whose accessible label / tooltip is the status.
-    const dot = screen.getByRole('img', { name: 'connected' });
+    const dot = screen.getByRole('button', { name: /C-Gate status: connected/i });
     expect(dot).toBeInTheDocument();
-    expect(dot).toHaveAttribute('title', 'connected');
   });
 
   it('connecting to a site loads its tree and reflects live state', async () => {
@@ -345,6 +357,21 @@ describe('App', () => {
     expect(screen.queryByText(/Exported/)).not.toBeInTheDocument();
   });
 
+  it('opens the C-Gate status panel and queries the server', async () => {
+    const { api, fireStatus } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    await act(async () => { fireStatus('connected'); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /C-Gate status/i }));
+    });
+    expect(api.getServerStatus).toHaveBeenCalled();
+    expect(await screen.findByRole('dialog', { name: 'C-Gate server status' })).toBeInTheDocument();
+    expect(await screen.findByText('v2.8.0')).toBeInTheDocument();
+    expect(screen.getAllByText('TESTPROJ').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('unsubscribes from bridge events on unmount', () => {
     const offStatus = jest.fn();
     const offState = jest.fn();
@@ -352,6 +379,7 @@ describe('App', () => {
       connect: jest.fn(),
       disconnect: jest.fn(),
       getTree: jest.fn().mockResolvedValue([]),
+      getServerStatus: jest.fn().mockResolvedValue(null),
       onStatus: jest.fn(() => offStatus),
       onState: jest.fn(() => offState),
       sites: {

@@ -13,6 +13,7 @@ import type {
   LabelExportInput,
   LabelExportResult,
 } from '../shared/types';
+import type { CgateServerStatus } from '../shared/cgateStatus';
 
 const CH = {
   connect: 'cgate:connect',
@@ -34,12 +35,14 @@ const CH = {
   projectImport: 'project:import',
   projectExport: 'project:export',
   nodeDetail: 'nodes:detail',
+  serverStatus: 'cgate:serverStatus',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
   connect: (opts: ConnectOptions): Promise<void> => ipcRenderer.invoke(CH.connect, opts),
   disconnect: (): Promise<void> => ipcRenderer.invoke(CH.disconnect),
   getTree: (network: string): Promise<Tree> => ipcRenderer.invoke(CH.getTree, network),
+  getServerStatus: (): Promise<CgateServerStatus> => ipcRenderer.invoke(CH.serverStatus),
   onStatus: (cb: (s: ConnectionStatus) => void) => {
     const h = (_e: unknown, s: ConnectionStatus) => cb(s);
     ipcRenderer.on(CH.status, h);

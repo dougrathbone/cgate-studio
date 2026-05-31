@@ -148,6 +148,28 @@ describe('CgateService', () => {
     expect(mock.commands).not.toContain('PROJECT LIST');
   });
 
+  it('queries live server status (greeting, PROJECT LIST, PROJECT DIR)', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port });
+    const st = await svc.getServerStatus();
+    expect(st.connection).toBe('connected');
+    expect(st.host).toBe('127.0.0.1');
+    expect(st.commandPort).toBe(mock.port);
+    expect(st.serverVersion).toBe('v2.8.0 (build 2307)');
+    expect(st.activeProject).toEqual({ name: 'TESTPROJ', state: 'started' });
+    expect(st.loadedProjects).toEqual([{ name: 'TESTPROJ', state: 'started' }]);
+    expect(st.projectsOnDisk.map((p) => p.name)).toEqual(['TESTPROJ', 'ARCHIVE']);
+    expect(mock.commands).toEqual(expect.arrayContaining(['PROJECT LIST', 'PROJECT DIR']));
+  });
+
+  it('returns a minimal status payload when disconnected', async () => {
+    svc = new CgateService();
+    const st = await svc.getServerStatus();
+    expect(st.connection).toBe('disconnected');
+    expect(st.serverVersion).toBeNull();
+    expect(st.loadedProjects).toEqual([]);
+  });
+
   it('sends ON for full level, OFF for zero, and RAMP for a mid level', async () => {
     svc = new CgateService();
     await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });

@@ -9,6 +9,13 @@ import type {
   CommandResult,
   GroupDetail,
 } from '../shared/types';
+import type { CgateServerStatus } from '../shared/cgateStatus';
+import {
+  isServiceReadyLine,
+  parseProjectLines,
+  parseServerVersion,
+  resolveActiveProject,
+} from './cgateStatusParse';
 
 // Use ES imports (not require) so the bundler inlines the vendored client into
 // the main-process bundle; otherwise the relative requires resolve against
@@ -61,6 +68,8 @@ export class CgateService extends EventEmitter {
   // ramp starts but not always a clean "finished" one, so this backstop ensures
   // the Stop control can never get stuck visible.
   private rampTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private serverGreeting: string | null = null;
+  private connectOpts: Pick<ConnectOptions, 'host' | 'commandPort' | 'eventPort'> | null = null;
 
   private setStatus(s: ConnectionStatus) {
     this.status = s;
@@ -88,6 +97,8 @@ export class CgateService extends EventEmitter {
     this.setStatus('connecting');
     // Prefer an explicitly configured project; otherwise discover it lazily.
     this.projectName = opts.project ?? null;
+    this.connectOpts = { host: opts.host, commandPort: opts.commandPort, eventPort: opts.eventPort };
+    this.serverGreeting = null;
     this.command = new CgateConnection('command', opts.host, opts.commandPort, {
       cgateusername: opts.username,
       cgatepassword: opts.password,
@@ -144,7 +155,10 @@ export class CgateService extends EventEmitter {
         resolve();
       };
       const arm = () => { clearTimeout(quietTimer); quietTimer = setTimeout(done, quietMs); };
-      const drain = () => arm();
+      const drain = (line: string) => {
+        if (isServiceReadyLine(line)) this.serverGreeting = line;
+        arm();
+      };
       const maxTimer = setTimeout(done, maxMs);
       this.commandConsumer = drain;
       arm();
@@ -171,7 +185,10 @@ export class CgateService extends EventEmitter {
       const line = this.commandBuf.slice(0, idx).replace(/\r$/, '');
       this.commandBuf = this.commandBuf.slice(idx + 1);
       const consumer = this.commandConsumer;
-      if (!consumer) continue; // unsolicited greeting / ack / async — discard
+      if (!consumer) {
+        if (isServiceReadyLine(line)) this.serverGreeting = line;
+        continue;
+      }
       // A consumer must never throw out of here (socket 'data' event) or it
       // would crash the main process.
       try {
@@ -371,6 +388,42 @@ export class CgateService extends EventEmitter {
     return this.sendCommand(`PROJECT SAVE${project ? ` ${project}` : ''}`);
   }
 
+  /** Query live C-Gate server status: version greeting, loaded/on-disk projects. */
+  async getServerStatus(): Promise<CgateServerStatus> {
+    const base: CgateServerStatus = {
+      connection: this.status,
+      host: this.connectOpts?.host ?? null,
+      commandPort: this.connectOpts?.commandPort ?? null,
+      eventPort: this.connectOpts?.eventPort ?? null,
+      commandConnected: !!this.command?.connected,
+      eventConnected: !!this.event?.connected,
+      serverVersion: parseServerVersion(this.serverGreeting),
+      serverGreeting: this.serverGreeting,
+      activeProject: null,
+      loadedProjects: [],
+      projectsOnDisk: [],
+    };
+
+    if (this.status !== 'connected' || !this.command) return base;
+
+    let loadedProjects = base.loadedProjects;
+    let projectsOnDisk = base.projectsOnDisk;
+    try {
+      loadedProjects = parseProjectLines((await this.sendCommand('PROJECT LIST')).lines);
+    } catch { /* C-Gate may reject when no tag DB — leave empty */ }
+    try {
+      projectsOnDisk = parseProjectLines((await this.sendCommand('PROJECT DIR')).lines);
+    } catch { /* same */ }
+
+    const projectName = await this.getProjectName();
+    return {
+      ...base,
+      loadedProjects,
+      projectsOnDisk,
+      activeProject: resolveActiveProject(loadedProjects, projectName || null),
+    };
+  }
+
   private handleEventData(buf: Buffer) {
     // Buffer partial lines across chunks and decode with StringDecoder so a line
     // (or a multibyte character) split across TCP packets parses correctly (M6).
@@ -434,6 +487,8 @@ export class CgateService extends EventEmitter {
     this.command = null;
     this.event = null;
     this.projectName = null;
+    this.connectOpts = null;
+    this.serverGreeting = null;
     this.commandConsumer = null;
     this.commandBuf = '';
     this.eventBuf = '';

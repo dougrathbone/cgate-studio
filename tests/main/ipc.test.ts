@@ -33,6 +33,19 @@ jest.mock('../../src/main/CgateService', () => {
     saveProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     getProjectName = jest.fn().mockResolvedValue('TESTPROJ');
     getGroupDetail = jest.fn().mockResolvedValue({ label: 'Kitchen', level: 200 });
+    getServerStatus = jest.fn().mockResolvedValue({
+      connection: 'connected',
+      host: 'h',
+      commandPort: 20023,
+      eventPort: 20025,
+      commandConnected: true,
+      eventConnected: true,
+      serverVersion: 'v2.8.0',
+      serverGreeting: null,
+      activeProject: { name: 'TESTPROJ', state: 'started' },
+      loadedProjects: [],
+      projectsOnDisk: [],
+    });
   }
   return { CgateService: FakeService };
 });
@@ -147,6 +160,13 @@ describe('registerIpc', () => {
     const detail = await lastHandler(CHANNELS.nodeDetail)({}, ref);
     expect(svc.getGroupDetail).toHaveBeenCalledWith(ref);
     expect(detail).toEqual({ label: 'Kitchen', level: 200 });
+  });
+
+  it('routes cgate:serverStatus to the service', async () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    const st = await lastHandler(CHANNELS.serverStatus)({});
+    expect(svc.getServerStatus).toHaveBeenCalled();
+    expect(st.serverVersion).toBe('v2.8.0');
   });
 
   it('project:import parses the chosen file and returns its labels', async () => {

@@ -26,6 +26,7 @@ export const CHANNELS = {
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
+  serverStatus: 'cgate:serverStatus',   // query live C-Gate server info
 } as const;
 
 const openDialogOptions = {
@@ -80,6 +81,7 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
   ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
   ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
+  ipcMain.handle(CHANNELS.serverStatus, () => svc.getServerStatus());
 
   // Open a native file picker for a C-Bus Toolkit project (.cbz) or raw project
   // .xml, then parse out its labels. Returns null when the user cancels. This is

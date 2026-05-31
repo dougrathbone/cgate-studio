@@ -27,6 +27,7 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
     clients.add(socket);
     socket.on('close', () => clients.delete(socket));
     socket.setEncoding('utf8');
+    socket.write('201 Service ready: Clipsal C-Gate Version: v2.8.0 (build 2307) #cmd-syntax=1.0\r\n');
     let buffer = '';
     socket.on('data', (chunk: string) => {
       buffer += chunk;
