@@ -73,6 +73,7 @@ describe('preload bridge', () => {
     await api.project.save();
     await api.project.name();
     await api.project.import();
+    await api.project.export({ tree: [], projectName: 'TEST' });
     await api.nodes.getGroupDetail(ref);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:setLevel', ref, 128, 4);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:terminateRamp', ref);
@@ -80,6 +81,7 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:save');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:name');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:import');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:export', { tree: [], projectName: 'TEST' });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:detail', ref);
   });
 });

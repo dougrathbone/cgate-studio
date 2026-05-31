@@ -9,6 +9,8 @@ import type {
   CommandResult,
   LabelImport,
   GroupDetail,
+  LabelExportInput,
+  LabelExportResult,
 } from '../shared/types';
 
 interface SitesApi {
@@ -31,6 +33,7 @@ interface ProjectApi {
   save(): Promise<CommandResult>;
   name(): Promise<string>;
   import(): Promise<LabelImport | null>;
+  export(input: LabelExportInput): Promise<LabelExportResult | null>;
 }
 
 interface NodesApi {

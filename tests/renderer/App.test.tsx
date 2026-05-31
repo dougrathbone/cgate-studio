@@ -61,6 +61,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
       save: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
       name: jest.fn().mockResolvedValue('TESTPROJ'),
       import: jest.fn().mockResolvedValue(null),
+      export: jest.fn().mockResolvedValue(null),
     },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
@@ -289,6 +290,45 @@ describe('App', () => {
     await act(async () => { fireEvent.click(screen.getByText('Import labels')); });
     expect(api.project.import).toHaveBeenCalled();
     expect(screen.queryByText(/Imported/)).not.toBeInTheDocument();
+  });
+
+  it('disables Export labels until a tree is loaded', async () => {
+    render(<App />);
+    await screen.findByText('Home');
+    expect(screen.getByText('Export labels')).toBeDisabled();
+  });
+
+  it('exports the current tree and shows a notice', async () => {
+    const { api } = installApi();
+    (api.project.export as jest.Mock).mockResolvedValue({
+      path: '/tmp/TESTPROJ.xml',
+      stats: { networkCount: 1, groupCount: 1, labelCount: 1, unitCount: 0 },
+    });
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    await act(async () => { fireEvent.click(screen.getByText('Export labels')); });
+    expect(api.project.export).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectName: 'TESTPROJ',
+        tree: expect.arrayContaining([
+          expect.objectContaining({ address: '254' }),
+        ]),
+      }),
+    );
+    expect(screen.getByText(/Exported 1 group label/)).toBeInTheDocument();
+    expect(screen.getByText(/TESTPROJ\.xml/)).toBeInTheDocument();
+  });
+
+  it('does nothing when the export save dialog is cancelled', async () => {
+    const { api } = installApi();
+    (api.project.export as jest.Mock).mockResolvedValue(null);
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    await act(async () => { fireEvent.click(screen.getByText('Export labels')); });
+    expect(api.project.export).toHaveBeenCalled();
+    expect(screen.queryByText(/Exported/)).not.toBeInTheDocument();
   });
 
   it('unsubscribes from bridge events on unmount', () => {

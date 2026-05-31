@@ -168,6 +168,23 @@ export function App() {
     }
   }
 
+  async function exportLabels() {
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await cgate().project.export({ tree, projectName });
+      if (!result) return; // user cancelled the save dialog
+      const { stats, path: savedPath } = result;
+      const base = savedPath.split(/[/\\]/).pop() ?? savedPath;
+      setNotice(
+        `Exported ${stats.labelCount} group label${stats.labelCount === 1 ? '' : 's'}`
+        + ` (${stats.groupCount} groups, ${stats.unitCount} units) to ${base}.`,
+      );
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
   function saveProject() {
     cgate()
       .project.save()
@@ -240,6 +257,15 @@ export function App() {
           {error && <span className="statusError" title={error}>⚠ {error}</span>}
           <button type="button" className="btn btn--ghost btn--sm" onClick={importLabels}>
             Import labels
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={exportLabels}
+            disabled={tree.length === 0}
+            title={tree.length === 0 ? 'Connect to a network first' : 'Export labels to a C-Bus project file'}
+          >
+            Export labels
           </button>
           <span
             className="statusDot statusDot--lg"

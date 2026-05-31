@@ -1,7 +1,14 @@
 jest.mock('electron', () => ({
   ipcMain: { handle: jest.fn() },
-  dialog: { showOpenDialog: jest.fn() },
+  dialog: { showOpenDialog: jest.fn(), showSaveDialog: jest.fn() },
   BrowserWindow: class {},
+}));
+
+jest.mock('../../src/main/projectExport', () => ({
+  exportLabelsToFile: jest.fn().mockReturnValue({
+    path: '/tmp/export.xml',
+    stats: { networkCount: 1, groupCount: 3, labelCount: 2, unitCount: 1 },
+  }),
 }));
 
 jest.mock('../../src/main/projectImport', () => ({
@@ -33,10 +40,13 @@ jest.mock('../../src/main/CgateService', () => {
 import { ipcMain, dialog } from 'electron';
 import { registerIpc, CHANNELS } from '../../src/main/ipc';
 import { importLabelsFromFile } from '../../src/main/projectImport';
+import { exportLabelsToFile } from '../../src/main/projectExport';
 
 const handleMock = ipcMain.handle as jest.Mock;
 const showOpenDialogMock = dialog.showOpenDialog as jest.Mock;
+const showSaveDialogMock = dialog.showSaveDialog as jest.Mock;
 const importMock = importLabelsFromFile as jest.Mock;
+const exportMock = exportLabelsToFile as jest.Mock;
 
 function fakeStore() {
   return {
@@ -146,5 +156,15 @@ describe('registerIpc', () => {
     const imp = await lastHandler(CHANNELS.projectImport)({});
     expect(imp).toBeNull();
     expect(importMock).not.toHaveBeenCalled();
+  });
+
+  it('project:export writes the chosen file and returns stats', async () => {
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/out.xml' });
+    registerIpc(() => null, fakeStore());
+    const input = { tree: [], projectName: 'MYPROJ' };
+    const result = await lastHandler(CHANNELS.projectExport)({}, input);
+    expect(showSaveDialogMock).toHaveBeenCalled();
+    expect(exportMock).toHaveBeenCalledWith('/tmp/out.xml', input);
+    expect(result?.stats.labelCount).toBe(2);
   });
 });

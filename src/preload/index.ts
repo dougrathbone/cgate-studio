@@ -10,6 +10,8 @@ import type {
   CommandResult,
   LabelImport,
   GroupDetail,
+  LabelExportInput,
+  LabelExportResult,
 } from '../shared/types';
 
 const CH = {
@@ -28,6 +30,7 @@ const CH = {
   projectSave: 'project:save',
   projectName: 'project:name',
   projectImport: 'project:import',
+  projectExport: 'project:export',
   nodeDetail: 'nodes:detail',
 };
 
@@ -65,6 +68,8 @@ contextBridge.exposeInMainWorld('cgate', {
     save: (): Promise<CommandResult> => ipcRenderer.invoke(CH.projectSave),
     name: (): Promise<string> => ipcRenderer.invoke(CH.projectName),
     import: (): Promise<LabelImport | null> => ipcRenderer.invoke(CH.projectImport),
+    export: (input: LabelExportInput): Promise<LabelExportResult | null> =>
+      ipcRenderer.invoke(CH.projectExport, input),
   },
   nodes: {
     getGroupDetail: (ref: GroupRef): Promise<GroupDetail> =>

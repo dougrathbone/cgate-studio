@@ -104,3 +104,20 @@ export interface LabelImport {
   groups: Record<string, string>;          // "254/56/4" -> "Kitchen"
   stats: { networkCount: number; groupCount: number; labelCount: number };
 }
+
+// Input for exporting the current tree as a C-Bus Toolkit-compatible tag-database
+// XML (.xml) or zipped project (.cbz). Read-only — never writes to C-Gate.
+export interface LabelExportInput {
+  tree: Tree;
+  projectName?: string | null;
+}
+
+export interface LabelExportResult {
+  path: string;
+  stats: {
+    networkCount: number;
+    groupCount: number;
+    labelCount: number;
+    unitCount: number;
+  };
+}

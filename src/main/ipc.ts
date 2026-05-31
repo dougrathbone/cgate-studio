@@ -2,7 +2,8 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { CgateService } from './CgateService';
 import { SiteStore } from './SiteStore';
 import { importLabelsFromFile } from './projectImport';
-import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport } from '../shared/types';
+import { exportLabelsToFile } from './projectExport';
+import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult } from '../shared/types';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -20,6 +21,7 @@ export const CHANNELS = {
   projectSave: 'project:save',          // M3: persist DB
   projectName: 'project:name',
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
+  projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
 } as const;
 
@@ -28,6 +30,15 @@ const openDialogOptions = {
   properties: ['openFile' as const],
   filters: [
     { name: 'C-Bus project', extensions: ['cbz', 'xml'] },
+    { name: 'All files', extensions: ['*'] },
+  ],
+};
+
+const saveDialogOptions = {
+  title: 'Export C-Bus project labels',
+  filters: [
+    { name: 'C-Bus project XML', extensions: ['xml'] },
+    { name: 'C-Bus project archive', extensions: ['cbz'] },
     { name: 'All files', extensions: ['*'] },
   ],
 };
@@ -69,6 +80,19 @@ export function registerIpc(
     const file = result.filePaths?.[0];
     if (result.canceled || !file) return null;
     return importLabelsFromFile(file);
+  });
+
+  // Write the current tree's labels to a Toolkit-compatible .xml or .cbz file.
+  // The renderer passes the merged tree (live + imported + staged renames).
+  ipcMain.handle(CHANNELS.projectExport, async (_e, input: LabelExportInput): Promise<LabelExportResult | null> => {
+    const win = getWindow();
+    const defaultPath = `${(input.projectName?.trim() || 'cbus-labels').replace(/[^\w.-]+/g, '_')}.xml`;
+    const result = win
+      ? await dialog.showSaveDialog(win, { ...saveDialogOptions, defaultPath })
+      : await dialog.showSaveDialog({ ...saveDialogOptions, defaultPath });
+    const file = result.filePath;
+    if (result.canceled || !file) return null;
+    return exportLabelsToFile(file, input);
   });
 
   return svc;
