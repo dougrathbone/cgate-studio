@@ -9,6 +9,8 @@ that C-Bus Toolkit drives under the hood) and gives C-Bus owners a native GUI fo
 their network. It is an open-source community tool and deliberately does **not**
 attempt Toolkit's proprietary unit-programming layer.
 
+![CBus Studio connected to a live C-Bus network — sites sidebar, device tree, and per-group live controls](docs/images/cbus-studio.png)
+
 ## Why
 
 C-Bus Toolkit is Windows-only, but the engine it drives — **C-Gate** — is pure
@@ -18,23 +20,46 @@ its documented interface." CBus Studio is that front-end.
 
 ## Features
 
-### Available now — M1: Connect & Browse (read-only)
+### Connect & Browse (M1)
 
 - Save **multiple C-Gate sites** (one per location) — name + host + command/event
   ports — and switch between them with one click. Sites persist locally (in the
   app's `userData` directory) so installers don't re-type connection details.
 - Connect to an existing C-Gate over TCP (command + event/status ports).
-- Render the network tree — **networks → applications → groups** — with labels,
-  parsed from `TREEXML`.
+- Render a **collapsible, filterable device tree** — networks → applications →
+  groups, plus the **physical units** (dimmers, relays, switches) on each network
+  with their type, firmware, and serial — parsed from `TREEXML`.
 - Show **live state** (on/off + level) on each group, updated in real time from
   the C-Gate event stream.
 
-### Roadmap
+### Operate & Test (M2)
 
-- **M2 — Commission / Test:** switch, ramp, and terminate-ramp a selected group
-  (transient commands only, no database writes) to verify wiring during an install.
-- **M3 — Organize:** view and **rename** network/application/group labels and
-  persist via `PROJECT SAVE` (gated behind an explicit edit mode + confirm-on-save).
+- Toggle a group **on/off**, **dim** it with a level slider (sent as a `RAMP`),
+  and **stop** an in-progress ramp — straight from the group's row in the tree.
+- The UI updates optimistically and then tracks the real state reported back on
+  the event stream, so you can verify wiring during an install.
+- Transient commands only — **no database writes**.
+
+### Organize (M3)
+
+- **Rename** network / application / group labels inline.
+- Edits are staged locally and shown as **unsaved changes**; nothing touches the
+  C-Gate database until you explicitly confirm a **`PROJECT SAVE`** (gated behind
+  a confirm-on-save banner).
+- **Import labels** from a Clipsal C-Bus Toolkit project file — either a `.cbz`
+  archive or the raw project `.xml`. CBus Studio reads the file locally, extracts
+  the network / application / group tag names, and overlays them onto the tree
+  (imported names are re-applied on every reconnect). This is **read-only
+  enrichment** — it never writes to C-Gate. To push imported names into the
+  project database, rename and `PROJECT SAVE` as above.
+
+### Reliability
+
+- Command-channel access is **serialized**, so a tree refresh can't interleave
+  with a toggle or rename and corrupt either response.
+- Both the command and event TCP streams use chunk-safe line buffering and
+  `StringDecoder`, so events split across packets — or multibyte characters in
+  labels — are reassembled correctly.
 
 ## Requirements
 
@@ -43,6 +68,37 @@ its documented interface." CBus Studio is that front-end.
   does not bundle C-Gate or a JRE.)
 - A **CNI (Ethernet)** C-Bus interface — everything is pure TCP. USB/serial PCI is
   out of scope.
+
+## Safety
+
+CBus Studio **only ever talks to C-Gate** — the same documented TCP command/event
+interface that C-Bus Toolkit itself drives. It never speaks to the C-Bus units or
+the CNI directly, never touches the bus electrically, and never downloads firmware
+or unit programming. Everything it does is a request that C-Gate validates and
+carries out on your behalf, exactly as Toolkit would.
+
+Because of that, the risk of CBus Studio **damaging your equipment is minimal**:
+
+- **Browsing** (M1) is entirely read-only.
+- **Operate / Test** (M2) sends only transient `ON` / `OFF` / `RAMP` /
+  `TERMINATE RAMP` commands — the same actions as flipping a switch on the wall.
+  Nothing is written to the database, and state reverts to whatever your logic
+  dictates.
+- **Organize** (M3) only changes **labels**, and never persists anything until you
+  explicitly confirm a `PROJECT SAVE`. It does not alter wiring, addressing,
+  scenes, schedules, or device logic.
+
+That said, **C-Bus controls real building services** (lighting, and potentially
+loads where unexpected switching matters). Software cannot know what a given group
+is wired to. So:
+
+> ⚠️ **Always consult your C-Bus / C-Gate documentation and the equipment
+> manuals**, and exercise the usual caution before operating groups on a live
+> system — particularly anything beyond ordinary lighting. Test against a
+> non-critical group first, and treat `PROJECT SAVE` (which writes to your project
+> database) with the same care you would any change in C-Bus Toolkit. CBus Studio
+> is provided **without warranty**; you are responsible for changes you make to
+> your installation.
 
 ## Getting started
 
@@ -59,9 +115,14 @@ IPC/preload bridge, and the React renderer — is unit-tested (renderer componen
 via `@testing-library/react` under jsdom; all networked logic against the
 in-process mock C-Gate). CI enforces a global **80% coverage** floor.
 
-`npm run dev` opens the app window; enter your C-Gate host and ports and click
-**Connect** to browse the network. A manual hardware-verification checklist lives in
+`npm run dev` opens the app window; add a **site** (name + C-Gate host + ports)
+and click **Connect** to browse, operate, and rename items on the network. A
+manual hardware-verification checklist lives in
 [`docs/smoke-checklist-m1.md`](docs/smoke-checklist-m1.md).
+
+> **Note on `PROJECT SAVE`:** rename + save writes to your live C-Gate project
+> database. Verify the behaviour against a throwaway group before relying on it in
+> production.
 
 ### Building installers
 
@@ -87,9 +148,10 @@ warning on first launch.
 ┌─────────────────────── Electron app ───────────────────────┐
 │  Renderer (React UI)          Main (Node)                   │
 │  ┌──────────────────┐  IPC   ┌──────────────────────────┐   │
-│  │ Connection form  │◄──────►│ CgateService             │   │
-│  │ Network tree     │        │  └─ vendored cgate-client│───┼──TCP──► C-Gate ──► CNI ──► C-Bus
-│  │ Live-state badges│        │     (conn, parsers,       │   │
+│  │ Site list / form │◄──────►│ CgateService             │   │
+│  │ Device tree      │        │  ├─ SiteStore (persisted)│   │
+│  │ Group controls   │        │  └─ vendored cgate-client│───┼──TCP──► C-Gate ──► CNI ──► C-Bus
+│  │ + rename / save  │        │     (conn, parsers,       │   │
 │  └──────────────────┘        │      TREEXML, events)     │   │
 │                              └──────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
