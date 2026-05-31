@@ -11,6 +11,7 @@ import type {
   GroupDetail,
   LabelExportInput,
   LabelExportResult,
+  CgateObjectParams,
 } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
@@ -41,6 +42,10 @@ interface ProjectApi {
 
 interface NodesApi {
   getGroupDetail(ref: GroupRef): Promise<GroupDetail>;
+  getGroupParams(ref: GroupRef): Promise<CgateObjectParams>;
+  getUnitParams(network: string, unit: string): Promise<CgateObjectParams>;
+  setGroupParam(ref: GroupRef, param: string, value: string): Promise<CommandResult>;
+  setUnitName(network: string, unit: string, name: string): Promise<CommandResult>;
 }
 
 interface CgateApi {

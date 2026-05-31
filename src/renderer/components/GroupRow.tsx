@@ -67,7 +67,7 @@ export function GroupRow({
       <StateBadge state={state} />
 
       {actions && !editing && (
-        <span className="group__controls">
+        <span className="group__controls" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <button
             type="button"
             className={on ? 'btn btn--sm toggle toggle--on' : 'btn btn--sm toggle'}

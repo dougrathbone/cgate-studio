@@ -4,8 +4,9 @@ import { SiteForm } from './components/SiteForm';
 import { SiteList } from './components/SiteList';
 import { DeviceTree } from './components/DeviceTree';
 import { CgateStatusPanel } from './components/CgateStatusPanel';
+import { EntityPanel } from './components/EntityPanel';
 import type { GroupActions } from './components/GroupRow';
-import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport } from '../shared/types';
+import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
 const refOf = (g: GroupNode) => ({ network: g.network, application: g.application, group: g.group });
@@ -93,6 +94,7 @@ export function App() {
   const [statusPanelOpen, setStatusPanelOpen] = useState(false);
   const [serverStatus, setServerStatus] = useState<CgateServerStatus | null>(null);
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
+  const [selection, setSelection] = useState<TreeSelection | null>(null);
 
   // Monotonic token: each (re)connect bumps it so enrichment from a stale
   // connection can't apply onto a newer tree. Refs let the async enrichment
@@ -104,7 +106,7 @@ export function App() {
   importedRef.current = imported;
 
   const applyLevel = (address: string, level: number) =>
-    setStates((prev) => ({ ...prev, [address]: { address, level, on: level > 0 } }));
+    setStates((prev) => ({ ...prev, [address]: { address, level, on: level > 0, ramping: false } }));
 
   // After the initial tree renders, lazily pull each group's tag name + live
   // level from C-Gate and merge them in as they arrive. Bounded concurrency
@@ -133,7 +135,7 @@ export function App() {
           const level = detail.level;
           // A live event is always fresher, so never overwrite an existing state.
           setStates((prev) =>
-            prev[g.address] ? prev : { ...prev, [g.address]: { address: g.address, level, on: level > 0 } });
+            prev[g.address] ? prev : { ...prev, [g.address]: { address: g.address, level, on: level > 0, ramping: false } });
         }
       }
     };
@@ -242,6 +244,15 @@ export function App() {
     if (status === 'disconnected') setServerStatus(null);
   }, [status, statusPanelOpen]);
 
+  useEffect(() => {
+    if (!selection) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelection(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selection]);
+
   async function addSite(input: SiteInput) {
     setSites(await cgate().sites.add(input));
   }
@@ -260,6 +271,7 @@ export function App() {
     setProjectName(null);
     setDirty(new Set());
     setConfirmSave(false);
+    setSelection(null);
     const imp = await cgate().sites.getImportedLabels(site.id);
     setImported(imp);
     try {
@@ -372,8 +384,37 @@ export function App() {
           </div>
           <SiteForm onAdd={addSite} />
         </aside>
-        <main className="main">
-          <DeviceTree tree={tree} states={states} actions={status === 'connected' ? actions : undefined} projectName={projectName} />
+        <main className={`main${selection ? ' main--split' : ''}`}>
+          <div className="main__tree">
+            <DeviceTree
+              tree={tree}
+              states={states}
+              actions={status === 'connected' ? actions : undefined}
+              projectName={projectName}
+              selection={selection}
+              onSelect={setSelection}
+            />
+          </div>
+          {selection && (
+            <EntityPanel
+              selection={selection}
+              state={selection.kind === 'group' ? states[selection.group.address] : undefined}
+              actions={status === 'connected' ? actions : undefined}
+              connected={status === 'connected'}
+              onGroupRenamed={(g, name) => {
+                setTree((prev) => relabel(prev, g.address, name || null));
+                setDirty((prev) => new Set(prev).add(g.address));
+              }}
+              onUnitRenamed={(net, addr, name) => {
+                setTree((prev) => prev.map((n) => n.address !== net ? n : {
+                  ...n,
+                  units: n.units.map((u) => u.address === addr ? { ...u, name: name || null } : u),
+                }));
+              }}
+              onError={setError}
+              onClose={() => setSelection(null)}
+            />
+          )}
         </main>
       </div>
     </div>

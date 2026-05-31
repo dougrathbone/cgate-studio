@@ -52,6 +52,20 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           // Group 99 simulates an unset tag; others return a deterministic label.
           const tag = group === '99' ? '<Unused>' : `Tag-${group}`;
           socket.write(`300 ${objPath} TagName="${tag}"\r\n`);
+        } else if (/^GET .+\s+\*/i.test(line)) {
+          commands.push(line);
+          const objPath = line.split(/\s+/)[1] ?? '';
+          const isUnit = /\/\d+\/p\/\d/i.test(objPath);
+          if (isUnit) {
+            socket.write(`300 ${objPath}: Name="KITCHEN DIMMER" CatalogNumber=DIMDC8 Firmware=1.0\r\n`);
+          } else {
+            const group = objPath.split('/').pop() ?? '';
+            const level = group === '4' ? 128 : 0;
+            const name = group === '4' ? 'Kitchen' : '';
+            socket.write(
+              `300 ${objPath}: Name="${name}" Level=${level} State=on RampTime=4 Protected=no EventLevel=5 Type=light Units=10,14\r\n`,
+            );
+          }
         } else if (/^GET .*\blevel\b/i.test(line)) {
           commands.push(line);
           const objPath = line.split(/\s+/)[1] ?? '';

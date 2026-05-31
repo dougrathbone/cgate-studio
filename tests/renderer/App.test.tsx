@@ -88,6 +88,15 @@ function installApi(initialSites: Site[] = [homeSite]) {
     },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
+      getGroupParams: jest.fn().mockResolvedValue({
+        Name: 'Kitchen',
+        Level: '128',
+        RampTime: '4',
+        Type: 'light',
+      }),
+      getUnitParams: jest.fn().mockResolvedValue({ Name: 'DIMMER' }),
+      setGroupParam: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      setUnitName: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
     },
   };
   (window as any).cgate = api;
@@ -308,6 +317,22 @@ describe('App', () => {
     expect(screen.queryByText('Live Tag')).not.toBeInTheDocument();
   });
 
+  it('loads persisted labels when connecting to a site', async () => {
+    const { api } = installApi();
+    (api.sites.getImportedLabels as jest.Mock).mockResolvedValue({
+      source: 'saved.cbz',
+      networks: {},
+      applications: {},
+      groups: { '254/56/4': 'Saved Label' },
+      stats: { networkCount: 1, groupCount: 1, labelCount: 1 },
+    });
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    expect(api.sites.getImportedLabels).toHaveBeenCalledWith('a');
+    expect(await screen.findByText('Saved Label')).toBeInTheDocument();
+  });
+
   it('does nothing when the import picker is cancelled', async () => {
     const { api } = installApi();
     (api.project.import as jest.Mock).mockResolvedValue(null);
@@ -333,7 +358,10 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('Home');
     await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    expect(await screen.findByText('Kitchen')).toBeInTheDocument();
+
     await act(async () => { fireEvent.click(screen.getByText('Export labels')); });
+
     expect(api.project.export).toHaveBeenCalledWith(
       expect.objectContaining({
         projectName: 'TESTPROJ',
@@ -355,6 +383,33 @@ describe('App', () => {
     await act(async () => { fireEvent.click(screen.getByText('Export labels')); });
     expect(api.project.export).toHaveBeenCalled();
     expect(screen.queryByText(/Exported/)).not.toBeInTheDocument();
+  });
+
+  it('closes the entity panel when Escape is pressed', async () => {
+    const { fireStatus } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    await act(async () => { fireStatus('connected'); });
+    const groupRows = screen.getAllByRole('button').filter((el) => el.textContent?.includes('254/56/4'));
+    await act(async () => { fireEvent.click(groupRows[0]); });
+    expect(await screen.findByRole('complementary', { name: 'Entity details' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('complementary', { name: 'Entity details' })).not.toBeInTheDocument();
+  });
+
+  it('opens the entity panel when a group row is selected', async () => {
+    const { api, fireStatus } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    await act(async () => { fireStatus('connected'); });
+    const groupRows = screen.getAllByRole('button').filter((el) => el.textContent?.includes('254/56/4'));
+    expect(groupRows.length).toBeGreaterThan(0);
+    await act(async () => { fireEvent.click(groupRows[0]); });
+    expect(api.nodes.getGroupParams).toHaveBeenCalled();
+    expect(await screen.findByRole('complementary', { name: 'Entity details' })).toBeInTheDocument();
+    expect(await screen.findByText('Group 254/56/4')).toBeInTheDocument();
   });
 
   it('opens the C-Gate status panel and queries the server', async () => {

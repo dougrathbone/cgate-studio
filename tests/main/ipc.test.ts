@@ -4,13 +4,6 @@ jest.mock('electron', () => ({
   BrowserWindow: class {},
 }));
 
-jest.mock('../../src/main/projectExport', () => ({
-  exportLabelsToFile: jest.fn().mockReturnValue({
-    path: '/tmp/export.xml',
-    stats: { networkCount: 1, groupCount: 3, labelCount: 2, unitCount: 1 },
-  }),
-}));
-
 jest.mock('../../src/main/projectImport', () => ({
   importLabelsFromFile: jest.fn().mockResolvedValue({
     source: 'home.cbz',
@@ -18,6 +11,13 @@ jest.mock('../../src/main/projectImport', () => ({
     applications: { '254/56': 'Lighting' },
     groups: { '254/56/4': 'Kitchen' },
     stats: { networkCount: 1, groupCount: 1, labelCount: 1 },
+  }),
+}));
+
+jest.mock('../../src/main/projectExport', () => ({
+  exportLabelsToFile: jest.fn().mockReturnValue({
+    path: '/tmp/export.xml',
+    stats: { networkCount: 1, groupCount: 3, labelCount: 2, unitCount: 1 },
   }),
 }));
 
@@ -33,6 +33,16 @@ jest.mock('../../src/main/CgateService', () => {
     saveProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     getProjectName = jest.fn().mockResolvedValue('TESTPROJ');
     getGroupDetail = jest.fn().mockResolvedValue({ label: 'Kitchen', level: 200 });
+    getGroupParams = jest.fn().mockResolvedValue({
+      Name: 'Kitchen',
+      Level: '128',
+      RampTime: '4',
+      Protected: 'no',
+      Type: 'light',
+    });
+    getUnitParams = jest.fn().mockResolvedValue({ Name: 'DIMMER', CatalogNumber: 'DIMDC8' });
+    setGroupParam = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    setUnitName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     getServerStatus = jest.fn().mockResolvedValue({
       connection: 'connected',
       host: 'h',
@@ -128,7 +138,8 @@ describe('registerIpc', () => {
 
   it('routes sites invocations to the store', async () => {
     const store = fakeStore();
-    registerIpc(() => null, store, fakeLabelStore());
+    const labels = fakeLabelStore();
+    registerIpc(() => null, store, labels);
     const input = { name: 'B', host: 'h2', commandPort: 3, eventPort: 4 };
     expect(await lastHandler(CHANNELS.sitesList)({})).toHaveLength(1);
     await lastHandler(CHANNELS.sitesAdd)({}, input);
@@ -167,6 +178,21 @@ describe('registerIpc', () => {
     const st = await lastHandler(CHANNELS.serverStatus)({});
     expect(svc.getServerStatus).toHaveBeenCalled();
     expect(st.serverVersion).toBe('v2.8.0');
+  });
+
+  it('routes nodes group/unit parameter handlers to the service', async () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    const ref = { network: '254', application: '56', group: '4' };
+    const groupParams = await lastHandler(CHANNELS.groupParams)({}, ref);
+    const unitParams = await lastHandler(CHANNELS.unitParams)({}, '254', '10');
+    await lastHandler(CHANNELS.setGroupParam)({}, ref, 'RampTime', '6');
+    await lastHandler(CHANNELS.setUnitName)({}, '254', '10', 'Hall');
+    expect(svc.getGroupParams).toHaveBeenCalledWith(ref);
+    expect(groupParams.Name).toBe('Kitchen');
+    expect(svc.getUnitParams).toHaveBeenCalledWith('254', '10');
+    expect(unitParams.Name).toBe('DIMMER');
+    expect(svc.setGroupParam).toHaveBeenCalledWith(ref, 'RampTime', '6');
+    expect(svc.setUnitName).toHaveBeenCalledWith('254', '10', 'Hall');
   });
 
   it('project:import parses the chosen file and returns its labels', async () => {

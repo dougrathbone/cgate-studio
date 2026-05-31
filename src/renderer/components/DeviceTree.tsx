@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState } from '../../shared/types';
+import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState, TreeSelection } from '../../shared/types';
 import { GroupRow, GroupActions } from './GroupRow';
 
 const INDENT = 18;
@@ -15,23 +15,42 @@ function Row({
   open,
   hasChildren,
   onToggle,
+  onSelect,
+  selected,
   children,
 }: {
   depth: number;
   open?: boolean;
   hasChildren?: boolean;
   onToggle?: () => void;
+  onSelect?: () => void;
+  selected?: boolean;
   children: React.ReactNode;
 }) {
-  const clickable = hasChildren && onToggle;
+  const expandable = hasChildren && onToggle;
+  const handleRowClick = () => {
+    if (onSelect) onSelect();
+    else if (expandable) onToggle?.();
+  };
   return (
     <div
-      className={clickable ? 'row row--clickable' : 'row'}
-      onClick={clickable ? onToggle : undefined}
+      className={`row${selected ? ' row--selected' : ''}${onSelect || expandable ? ' row--clickable' : ''}`}
       style={{ paddingLeft: 8 + depth * INDENT }}
+      onClick={handleRowClick}
+      role={onSelect ? 'button' : expandable ? 'button' : undefined}
+      tabIndex={onSelect || expandable ? 0 : undefined}
+      onKeyDown={onSelect || expandable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(); }
+      } : undefined}
     >
-      <Caret open={!!open} hasChildren={!!hasChildren} />
-      {children}
+      <span
+        className="row__caretWrap"
+        onClick={expandable ? (e) => { e.stopPropagation(); onToggle(); } : undefined}
+        aria-hidden={!expandable}
+      >
+        <Caret open={!!open} hasChildren={!!hasChildren} />
+      </span>
+      <span className="row__body">{children}</span>
     </div>
   );
 }
@@ -50,16 +69,24 @@ function appMatches(a: AppNode, q: string): boolean {
   return a.groups.some((g) => groupMatches(g, q));
 }
 
+export function selectionId(sel: TreeSelection): string {
+  return sel.kind === 'group' ? `g:${sel.group.address}` : `u:${sel.network}:${sel.unit.address}`;
+}
+
 export function DeviceTree({
   tree,
   states,
   actions,
   projectName,
+  selection,
+  onSelect,
 }: {
   tree: Tree;
   states: Record<string, GroupState>;
   actions?: GroupActions;
   projectName?: string | null;
+  selection?: TreeSelection | null;
+  onSelect?: (sel: TreeSelection) => void;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
@@ -108,6 +135,8 @@ export function DeviceTree({
           filtering={filtering}
           isOpen={isOpen}
           toggle={toggle}
+          selection={selection}
+          onSelect={onSelect}
         />
       ))}
     </div>
@@ -123,6 +152,8 @@ function NetworkBlock({
   filtering,
   isOpen,
   toggle,
+  selection,
+  onSelect,
 }: {
   net: NetworkNode;
   states: Record<string, GroupState>;
@@ -132,6 +163,8 @@ function NetworkBlock({
   filtering: boolean;
   isOpen: (k: string, d: boolean) => boolean;
   toggle: (k: string, d: boolean) => void;
+  selection?: TreeSelection | null;
+  onSelect?: (sel: TreeSelection) => void;
 }) {
   const units = net.units ?? [];
   const apps = net.applications ?? [];
@@ -182,7 +215,12 @@ function NetworkBlock({
                   </Row>
                   {appOpen &&
                     groups.map((g) => (
-                      <Row key={g.address} depth={3}>
+                      <Row
+                        key={g.address}
+                        depth={3}
+                        selected={selection != null && selectionId(selection) === `g:${g.address}`}
+                        onSelect={onSelect ? () => onSelect({ kind: 'group', group: g }) : undefined}
+                      >
                         <GroupRow group={g} state={states[g.address]} actions={actions} />
                       </Row>
                     ))}
@@ -206,7 +244,14 @@ function NetworkBlock({
               const uOpen = isOpen(uKey, false);
               return (
                 <div key={u.address}>
-                  <Row depth={2} open={uOpen} hasChildren onToggle={() => toggle(uKey, false)}>
+                  <Row
+                    depth={2}
+                    open={uOpen}
+                    hasChildren
+                    onToggle={() => toggle(uKey, false)}
+                    selected={selection != null && selectionId(selection) === `u:${net.address}:${u.address}`}
+                    onSelect={onSelect ? () => onSelect({ kind: 'unit', network: net.address, unit: u }) : undefined}
+                  >
                     <span className="row__addr" style={{ minWidth: 32 }}>
                       <strong>{u.address}</strong>
                     </span>

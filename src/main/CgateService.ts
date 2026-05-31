@@ -9,6 +9,7 @@ import type {
   CommandResult,
   GroupDetail,
 } from '../shared/types';
+import type { CgateObjectParams } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 import {
   isServiceReadyLine,
@@ -16,6 +17,7 @@ import {
   parseServerVersion,
   resolveActiveProject,
 } from './cgateStatusParse';
+import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
 
 // Use ES imports (not require) so the bundler inlines the vendored client into
 // the main-process bundle; otherwise the relative requires resolve against
@@ -373,12 +375,37 @@ export class CgateService extends EventEmitter {
     return { label, level };
   }
 
-  // Rename a group's label by setting its `Name` parameter in the project DB.
-  // This is an in-memory change on the C-Gate server until saveProject() runs.
+  // Rename a group's label by setting its `Name` parameter. Quoted when needed.
   async setName(ref: GroupRef, name: string): Promise<CommandResult> {
     const path = await this.groupPath(ref);
-    const clean = name.replace(/[\r\n]/g, ' ').trim();
-    return this.sendCommand(`SET ${path} Name ${clean}`);
+    return this.sendCommand(`SET ${path} Name ${formatCgateSetValue(name)}`);
+  }
+
+  async getGroupParams(ref: GroupRef): Promise<CgateObjectParams> {
+    return this.getObjectParams(await this.groupPath(ref));
+  }
+
+  async getUnitParams(network: string, unitAddress: string): Promise<CgateObjectParams> {
+    const project = await this.getProjectName();
+    const prefix = project ? `//${project}/` : '//';
+    return this.getObjectParams(`${prefix}${network}/p/${unitAddress}`);
+  }
+
+  async setGroupParam(ref: GroupRef, param: string, value: string): Promise<CommandResult> {
+    const path = await this.groupPath(ref);
+    return this.sendCommand(`SET ${path} ${param} ${formatCgateSetValue(value)}`);
+  }
+
+  async setUnitName(network: string, unitAddress: string, name: string): Promise<CommandResult> {
+    const project = await this.getProjectName();
+    const prefix = project ? `//${project}/` : '//';
+    const path = `${prefix}${network}/p/${unitAddress}`;
+    return this.sendCommand(`SET ${path} Name ${formatCgateSetValue(name)}`);
+  }
+
+  private async getObjectParams(path: string): Promise<CgateObjectParams> {
+    const res = await this.sendCommand(`GET ${path} *`);
+    return parseObjectParams(res.lines);
   }
 
   // Persist project DB changes (e.g. renamed labels) to disk. The only command

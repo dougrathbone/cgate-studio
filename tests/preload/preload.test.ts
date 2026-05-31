@@ -81,6 +81,10 @@ describe('preload bridge', () => {
     await api.project.import();
     await api.project.export({ tree: [], projectName: 'TEST' });
     await api.nodes.getGroupDetail(ref);
+    await api.nodes.getGroupParams(ref);
+    await api.nodes.getUnitParams('254', '10');
+    await api.nodes.setGroupParam(ref, 'RampTime', '6');
+    await api.nodes.setUnitName('254', '10', 'Hall');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:setLevel', ref, 128, 4);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:terminateRamp', ref);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('labels:rename', ref, 'Kitchen');
@@ -89,5 +93,9 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:import');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:export', { tree: [], projectName: 'TEST' });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:detail', ref);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:groupParams', ref);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:unitParams', '254', '10');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:setGroupParam', ref, 'RampTime', '6');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:setUnitName', '254', '10', 'Hall');
   });
 });

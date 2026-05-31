@@ -121,3 +121,11 @@ export interface LabelExportResult {
     unitCount: number;
   };
 }
+
+/** A node selected in the device tree for the detail panel. */
+export type TreeSelection =
+  | { kind: 'group'; group: GroupNode }
+  | { kind: 'unit'; network: string; unit: UnitNode };
+
+/** Parameters returned by `GET //…/path *` on the C-Gate command channel. */
+export type CgateObjectParams = Record<string, string>;

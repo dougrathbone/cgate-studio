@@ -69,7 +69,7 @@ describe('CgateService', () => {
     ]);
   });
 
-  it('flags a group as ramping, then auto-clears it if no settle event arrives', () => {
+  it('fetches a group detail (label via DBGET TagName, level via GET level)', async () => {
     jest.useFakeTimers();
     try {
       svc = new CgateService();
@@ -215,8 +215,17 @@ describe('CgateService', () => {
     await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
     await svc.setName(ref, 'Kitchen Lights');
     await svc.saveProject();
-    expect(mock.commands).toContain('SET //P/254/56/4 Name Kitchen Lights');
+    expect(mock.commands).toContain('SET //P/254/56/4 Name "Kitchen Lights"');
     expect(mock.commands).toContain('PROJECT SAVE P');
+  });
+
+  it('fetches group parameters via GET *', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    const params = await svc.getGroupParams(ref);
+    expect(params.Name).toBe('Kitchen');
+    expect(params.Level).toBe('128');
+    expect(mock.commands).toContain('GET //P/254/56/4 *');
   });
 
   it('rejects when C-Gate returns an error response code', async () => {

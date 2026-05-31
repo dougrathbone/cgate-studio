@@ -311,6 +311,18 @@ body {
   padding: var(--s4);
   min-height: 0;
 }
+.main--split {
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.main__tree {
+  flex: 1;
+  overflow: auto;
+  padding: var(--s4);
+  min-width: 0;
+}
 
 /* ---- Empty state ----------------------------------------------------- */
 
@@ -531,6 +543,25 @@ input[type="number"] {
 }
 .row--clickable:hover {
   background: var(--panel-2);
+}
+.row--selected {
+  background: var(--accent-soft);
+  outline: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  outline-offset: -1px;
+}
+.row__caretWrap {
+  display: inline-flex;
+  width: 14px;
+  flex-shrink: 0;
+  cursor: default;
+}
+.row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
 }
 .row__caret {
   display: inline-block;
@@ -842,4 +873,88 @@ input[type="range"].slider::-webkit-slider-thumb:hover {
 .statusDotBtn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* --- Entity detail panel --- */
+.entityPanel {
+  width: 360px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+.entityPanel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 1;
+}
+.entityPanel__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+.entityPanel__subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.entityPanel__loading {
+  padding: var(--s4);
+  color: var(--text-3);
+  font-size: 13px;
+}
+.entityPanel__section {
+  padding: var(--s3) var(--s4) var(--s4);
+}
+.entityPanel__sectionTitle {
+  margin: 0 0 var(--s3);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.entityPanel__live {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.entityPanel__param {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--s2);
+  align-items: center;
+  margin-bottom: var(--s2);
+}
+.entityPanel__paramKey {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.entityPanel__paramVal,
+.entityPanel__input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.entityPanel__input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+.entityPanel__hint {
+  margin: 0 var(--s4) var(--s4);
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.45;
 }

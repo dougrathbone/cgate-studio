@@ -14,6 +14,7 @@ import type {
   LabelExportResult,
 } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
+import type { CgateObjectParams } from '../shared/types';
 
 const CH = {
   connect: 'cgate:connect',
@@ -36,6 +37,10 @@ const CH = {
   projectExport: 'project:export',
   nodeDetail: 'nodes:detail',
   serverStatus: 'cgate:serverStatus',
+  groupParams: 'nodes:groupParams',
+  unitParams: 'nodes:unitParams',
+  setGroupParam: 'nodes:setGroupParam',
+  setUnitName: 'nodes:setUnitName',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
@@ -83,5 +88,13 @@ contextBridge.exposeInMainWorld('cgate', {
   nodes: {
     getGroupDetail: (ref: GroupRef): Promise<GroupDetail> =>
       ipcRenderer.invoke(CH.nodeDetail, ref),
+    getGroupParams: (ref: GroupRef): Promise<CgateObjectParams> =>
+      ipcRenderer.invoke(CH.groupParams, ref),
+    getUnitParams: (network: string, unit: string): Promise<CgateObjectParams> =>
+      ipcRenderer.invoke(CH.unitParams, network, unit),
+    setGroupParam: (ref: GroupRef, param: string, value: string): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.setGroupParam, ref, param, value),
+    setUnitName: (network: string, unit: string, name: string): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.setUnitName, network, unit, name),
   },
 });
