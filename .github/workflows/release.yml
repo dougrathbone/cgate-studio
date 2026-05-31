@@ -23,6 +23,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach installers to (e.g. v1.1.0)
+        required: true
+        default: v1.1.0
 
 permissions:
   contents: write
@@ -51,7 +56,8 @@ jobs:
   build-installer:
     name: Build installer (${{ matrix.platform }})
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch' }}
+    # release-please may fail when Actions cannot open PRs; still build on manual runs.
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.release_created == 'true') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -103,7 +109,10 @@ jobs:
   publish-installers:
     name: Attach installers to GitHub Release
     needs: [release-please, build-installer]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: >-
+      ${{ always() && needs.build-installer.result == 'success'
+      && (needs.release-please.outputs.release_created == 'true'
+          || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     steps:
       - name: Download installer artifacts
@@ -119,7 +128,7 @@ jobs:
       - name: Upload installers to the release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          tag_name: ${{ needs.release-please.outputs.tag_name || github.event.inputs.tag }}
           files: |
             installers/**/*.dmg
             installers/**/*.exe
