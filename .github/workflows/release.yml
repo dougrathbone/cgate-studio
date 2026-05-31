@@ -8,16 +8,16 @@ name: Release
 #      (semver: feat -> minor, fix -> patch, `!`/BREAKING CHANGE -> major) and
 #      regenerates CHANGELOG.md.
 #   2. Merging that PR tags the commit `vX.Y.Z` and publishes a GitHub Release.
-#   3. We then build the macOS and Windows installers on their native runners and
-#      attach them to that release, so people can download a real installer.
+#   3. Native macOS (.dmg + .zip) and Windows (NSIS .exe) installers are built on
+#      their respective runners and attached to that release in one upload step.
 #
-# Manual runs (workflow_dispatch) build installers as artifacts only — handy for
-# smoke-testing a packaged build without cutting a release.
+# Manual runs (workflow_dispatch) build installers as workflow artifacts only —
+# useful for smoke-testing packaging without cutting a release.
 #
-# Note: the installer build lives in this same workflow (gated on
-# `release_created`) on purpose. A tag pushed by release-please uses the default
-# GITHUB_TOKEN, which by design does NOT re-trigger tag/`release`-triggered
-# workflows — so a separate tag-triggered workflow would never fire.
+# Installer builds live in this workflow (gated on `release_created`) on purpose.
+# A tag pushed by release-please uses the default GITHUB_TOKEN, which does not
+# re-trigger tag/`release`-triggered workflows — a separate tag-only workflow
+# would never fire.
 
 on:
   push:
@@ -48,10 +48,9 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  installers:
-    name: Installer (${{ matrix.platform }})
+  build-installer:
+    name: Build installer (${{ matrix.platform }})
     needs: release-please
-    # Build on a fresh release, or on demand via "Run workflow".
     if: ${{ needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -76,30 +75,65 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build installer
+      - name: Build native installer
         run: npm run dist:${{ matrix.platform }}
         env:
-          # No Apple Developer / Windows code-signing cert in CI — build unsigned
-          # instead of failing.
+          # No Apple Developer / Windows code-signing cert in CI — ship unsigned
+          # instead of failing the build.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload installer artifacts
+      - name: List release outputs
+        shell: bash
+        run: |
+          echo "Packaged artifacts:"
+          ls -la release/
+          ls -la release/*.dmg release/*.exe release/*-mac.zip 2>/dev/null || true
+
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cbus-studio-${{ matrix.platform }}
+          name: installer-${{ matrix.platform }}
           path: |
             release/*.dmg
             release/*.exe
             release/*-mac.zip
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
-      - name: Attach installers to the GitHub Release
-        if: ${{ needs.release-please.outputs.release_created == 'true' }}
+  publish-installers:
+    name: Attach installers to GitHub Release
+    needs: [release-please, build-installer]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: installers
+
+      - name: List assets to publish
+        run: find installers -type f | sort
+
+      - name: Upload installers to the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: |
-            release/*.dmg
-            release/*.exe
-            release/*-mac.zip
+            installers/**/*.dmg
+            installers/**/*.exe
+            installers/**/*.zip
+          fail_on_unmatched_files: true
+          append_body: true
+          body: |
+            ## Installers
+
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | **macOS** | `.dmg` | Recommended — drag to Applications |
+            | **macOS** | `-mac.zip` | Portable archive (Apple Silicon + Intel) |
+            | **Windows** | `.exe` | NSIS installer — choose install directory |
+
+            Installers are **unsigned** (no Apple / Windows code-signing certificate yet).
+            See the [README](https://github.com/dougrathbone/cgate-studio#download) for first-launch steps.

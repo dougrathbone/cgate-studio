@@ -9,24 +9,34 @@ files:
   - package.json
 asar: true
 
+extraResources:
+  - LICENSE
+
 directories:
   output: release
   buildResources: build
 
 mac:
   category: public.app-category.utilities
+  # Universal binary: one .dmg/.zip for Apple Silicon and Intel Macs (built on CI arm64).
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: universal
+    - target: zip
+      arch: universal
   # No Apple Developer cert wired up yet: ship unsigned (Gatekeeper will warn).
   # CI sets CSC_IDENTITY_AUTO_DISCOVERY=false so unsigned builds don't fail.
   identity: null
 
 win:
   target:
-    - nsis
+    - target: nsis
+      arch:
+        - x64
 
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  # electron-builder default; explicit for release artifact glob (*.exe).
+  artifactName: ${productName} Setup ${version}.${ext}

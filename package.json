@@ -15,8 +15,13 @@
     "dist:win": "npm run build && electron-builder --win --publish never"
   },
   "keywords": [],
-  "author": "",
+  "author": "Doug Rathbone",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dougrathbone/cgate-studio.git"
+  },
+  "homepage": "https://github.com/dougrathbone/cgate-studio",
   "type": "commonjs",
   "dependencies": {
     "adm-zip": "^0.5.17",

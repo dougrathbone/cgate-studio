@@ -151,8 +151,8 @@ manual hardware-verification checklist lives in
 `release/`:
 
 ```bash
-npm run dist:mac   # macOS .dmg + .zip (built on macOS)
-npm run dist:win   # Windows NSIS .exe installer (built on Windows)
+npm run dist:mac   # macOS universal .dmg + .zip (built on macOS)
+npm run dist:win   # Windows x64 NSIS .exe installer (built on Windows)
 npm run dist       # installer(s) for the current host platform
 ```
 
@@ -174,7 +174,8 @@ Releases follow [Semantic Versioning](https://semver.org/) and are automated wit
   `package.json` and updates [`CHANGELOG.md`](CHANGELOG.md). Review and merge it
   when you're ready to ship.
 - Merging the release PR tags the commit `vX.Y.Z`, publishes a **GitHub Release**,
-  and kicks off the macOS + Windows installer builds, which are attached to that
+  and builds **macOS** (`.dmg` + `.zip`, universal Apple Silicon + Intel) and
+  **Windows** (`.exe` NSIS) installers on native CI runners, attached to that
   release for download.
 
 No manual tagging, version bumping, or changelog editing is required; everything
