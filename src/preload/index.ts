@@ -6,6 +6,10 @@ import type {
   ConnectionStatus,
   Site,
   SiteInput,
+  GroupRef,
+  CommandResult,
+  LabelImport,
+  GroupDetail,
 } from '../shared/types';
 
 const CH = {
@@ -18,6 +22,13 @@ const CH = {
   sitesAdd: 'sites:add',
   sitesUpdate: 'sites:update',
   sitesRemove: 'sites:remove',
+  setLevel: 'control:setLevel',
+  terminateRamp: 'control:terminateRamp',
+  rename: 'labels:rename',
+  projectSave: 'project:save',
+  projectName: 'project:name',
+  projectImport: 'project:import',
+  nodeDetail: 'nodes:detail',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
@@ -39,5 +50,24 @@ contextBridge.exposeInMainWorld('cgate', {
     add: (input: SiteInput): Promise<Site[]> => ipcRenderer.invoke(CH.sitesAdd, input),
     update: (site: Site): Promise<Site[]> => ipcRenderer.invoke(CH.sitesUpdate, site),
     remove: (id: string): Promise<Site[]> => ipcRenderer.invoke(CH.sitesRemove, id),
+  },
+  control: {
+    setLevel: (ref: GroupRef, level: number, rampSecs?: number): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.setLevel, ref, level, rampSecs),
+    terminateRamp: (ref: GroupRef): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.terminateRamp, ref),
+  },
+  labels: {
+    rename: (ref: GroupRef, name: string): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.rename, ref, name),
+  },
+  project: {
+    save: (): Promise<CommandResult> => ipcRenderer.invoke(CH.projectSave),
+    name: (): Promise<string> => ipcRenderer.invoke(CH.projectName),
+    import: (): Promise<LabelImport | null> => ipcRenderer.invoke(CH.projectImport),
+  },
+  nodes: {
+    getGroupDetail: (ref: GroupRef): Promise<GroupDetail> =>
+      ipcRenderer.invoke(CH.nodeDetail, ref),
   },
 });

@@ -64,4 +64,22 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:update', { id: 'x', ...input });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('sites:remove', 'x');
   });
+
+  it('exposes control, labels, and project APIs mapped to their IPC channels', async () => {
+    const ref = { network: '254', application: '56', group: '4' };
+    await api.control.setLevel(ref, 128, 4);
+    await api.control.terminateRamp(ref);
+    await api.labels.rename(ref, 'Kitchen');
+    await api.project.save();
+    await api.project.name();
+    await api.project.import();
+    await api.nodes.getGroupDetail(ref);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:setLevel', ref, 128, 4);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:terminateRamp', ref);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('labels:rename', ref, 'Kitchen');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:save');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:name');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:import');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:detail', ref);
+  });
 });

@@ -50,6 +50,21 @@ function installApi(initialSites: Site[] = [homeSite]) {
       update: jest.fn(),
       remove: jest.fn().mockResolvedValue([]),
     },
+    control: {
+      setLevel: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      terminateRamp: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+    },
+    labels: {
+      rename: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+    },
+    project: {
+      save: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      name: jest.fn().mockResolvedValue('TESTPROJ'),
+      import: jest.fn().mockResolvedValue(null),
+    },
+    nodes: {
+      getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
+    },
   };
   (window as any).cgate = api;
   return { api, fireStatus: (s: any) => statusCb(s), fireState: (s: any) => stateCb(s) };
@@ -64,7 +79,10 @@ describe('App', () => {
     expect(api.onState).toHaveBeenCalled();
     expect(await screen.findByText('Home')).toBeInTheDocument();
     act(() => fireStatus('connected'));
-    expect(screen.getByText('connected')).toBeInTheDocument();
+    // Status renders as a colored dot whose accessible label / tooltip is the status.
+    const dot = screen.getByRole('img', { name: 'connected' });
+    expect(dot).toBeInTheDocument();
+    expect(dot).toHaveAttribute('title', 'connected');
   });
 
   it('connecting to a site loads its tree and reflects live state', async () => {
@@ -131,6 +149,146 @@ describe('App', () => {
     await screen.findByText('Home');
     await act(async () => { fireEvent.click(screen.getByText('Connect')); });
     expect(await screen.findByText(/TREEXML timed out/)).toBeInTheDocument();
+  });
+
+  it('operates a group (switch on) when connected', async () => {
+    const { api, fireStatus } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    act(() => fireStatus('connected'));
+    // Controls only appear when connected.
+    fireEvent.click(await screen.findByLabelText('Turn on 254/56/4'));
+    expect(api.control.setLevel).toHaveBeenCalledWith(
+      { network: '254', application: '56', group: '4' }, 255, undefined,
+    );
+  });
+
+  it('renames a group, shows the unsaved banner, and saves on confirmation', async () => {
+    const { api, fireStatus } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    act(() => fireStatus('connected'));
+
+    fireEvent.click(await screen.findByLabelText('Edit label 254/56/4'));
+    const input = screen.getByLabelText('Rename 254/56/4');
+    fireEvent.change(input, { target: { value: 'Lounge' } });
+    await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }); });
+
+    expect(api.labels.rename).toHaveBeenCalledWith(
+      { network: '254', application: '56', group: '4' }, 'Lounge',
+    );
+    // The unsaved-changes banner appears; saving requires explicit confirmation.
+    expect(await screen.findByText(/1 unsaved label change/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Save to project'));
+    await act(async () => { fireEvent.click(screen.getByText('Confirm save')); });
+    expect(api.project.save).toHaveBeenCalled();
+    expect(screen.queryByText(/unsaved label change/)).not.toBeInTheDocument();
+  });
+
+  it('imports project labels and overlays them on the connected tree', async () => {
+    const { api } = installApi();
+    (api.project.import as jest.Mock).mockResolvedValue({
+      source: 'home.cbz',
+      networks: {},
+      applications: {},
+      groups: { '254/56/4': 'Master Bedroom' },
+      stats: { networkCount: 1, groupCount: 1, labelCount: 1 },
+    });
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    // Live tree shows the C-Gate label first.
+    expect(await screen.findByText('Kitchen')).toBeInTheDocument();
+
+    await act(async () => { fireEvent.click(screen.getByText('Import labels')); });
+
+    expect(api.project.import).toHaveBeenCalled();
+    // Imported label overrides the live one, and a notice is shown.
+    expect(await screen.findByText('Master Bedroom')).toBeInTheDocument();
+    expect(screen.queryByText('Kitchen')).not.toBeInTheDocument();
+    expect(screen.getByText(/Imported 1 label from home\.cbz/)).toBeInTheDocument();
+  });
+
+  it('enriches groups with labels and levels fetched after the initial load', async () => {
+    const unlabelled: Tree = [
+      {
+        kind: 'network', address: '254', label: null,
+        applications: [
+          {
+            kind: 'application', address: '56', label: null,
+            groups: [
+              { kind: 'group', address: '254/56/4', network: '254', application: '56', group: '4', label: null },
+            ],
+          },
+        ],
+        units: [],
+      },
+    ];
+    const { api } = installApi();
+    (api.getTree as jest.Mock).mockResolvedValue(unlabelled);
+    (api.nodes.getGroupDetail as jest.Mock).mockResolvedValue({ label: 'Pantry', level: 255 });
+
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+
+    expect(api.nodes.getGroupDetail).toHaveBeenCalledWith({ network: '254', application: '56', group: '4' });
+    // The fetched tag name fills in the previously unlabelled group...
+    expect(await screen.findByText('Pantry')).toBeInTheDocument();
+    // ...and the fetched level seeds the live state badge.
+    expect(await screen.findByText('ON 100%')).toBeInTheDocument();
+  });
+
+  it('keeps an imported label over one fetched during enrichment', async () => {
+    const unlabelled: Tree = [
+      {
+        kind: 'network', address: '254', label: null,
+        applications: [
+          {
+            kind: 'application', address: '56', label: null,
+            groups: [
+              { kind: 'group', address: '254/56/4', network: '254', application: '56', group: '4', label: null },
+            ],
+          },
+        ],
+        units: [],
+      },
+    ];
+    const { api } = installApi();
+    (api.getTree as jest.Mock).mockResolvedValue(unlabelled);
+    (api.project.import as jest.Mock).mockResolvedValue({
+      source: 'home.cbz', networks: {}, applications: {},
+      groups: { '254/56/4': 'Imported Name' },
+      stats: { networkCount: 1, groupCount: 1, labelCount: 1 },
+    });
+    // Enrichment would otherwise label it "Live Tag".
+    let release: (v: unknown) => void = () => {};
+    (api.nodes.getGroupDetail as jest.Mock).mockReturnValue(
+      new Promise((res) => { release = res; }),
+    );
+
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Import labels')); });
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    expect(await screen.findByText('Imported Name')).toBeInTheDocument();
+
+    // Now let enrichment resolve: the imported label must win.
+    await act(async () => { release({ label: 'Live Tag', level: null }); });
+    expect(screen.getByText('Imported Name')).toBeInTheDocument();
+    expect(screen.queryByText('Live Tag')).not.toBeInTheDocument();
+  });
+
+  it('does nothing when the import picker is cancelled', async () => {
+    const { api } = installApi();
+    (api.project.import as jest.Mock).mockResolvedValue(null);
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Import labels')); });
+    expect(api.project.import).toHaveBeenCalled();
+    expect(screen.queryByText(/Imported/)).not.toBeInTheDocument();
   });
 
   it('unsubscribes from bridge events on unmount', () => {

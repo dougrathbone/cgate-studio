@@ -71,6 +71,11 @@ describe('DeviceTree', () => {
     expect(screen.getByText('Relay')).toBeInTheDocument();
   });
 
+  it('shows the project name next to the network to identify it', () => {
+    render(<DeviceTree tree={tree} states={{}} projectName="5COGAN" />);
+    expect(screen.getByText('5COGAN')).toBeInTheDocument();
+  });
+
   it('expands a unit to reveal device detail', () => {
     render(<DeviceTree tree={tree} states={{}} />);
     expect(screen.queryByText('100906.2211')).not.toBeInTheDocument();

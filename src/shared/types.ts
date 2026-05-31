@@ -63,6 +63,44 @@ export interface GroupState {
   address: string;        // "254/56/4"
   level: number;          // 0-255
   on: boolean;
+  ramping?: boolean;      // true while a ramp is in progress (drives the Stop control)
 }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+
+// Identifies a single group on the network, used to address control / rename
+// commands (built into a C-Gate path like "//PROJECT/254/56/4").
+export interface GroupRef {
+  network: string;
+  application: string;
+  group: string;
+}
+
+// Per-group detail fetched lazily from C-Gate after the initial tree loads:
+// the project-DB tag name and the current live level. Either may be null when
+// the install has no tag database / the object is unset.
+export interface GroupDetail {
+  label: string | null;
+  level: number | null;
+}
+
+// The outcome of a C-Gate command sent on the command connection. `code` is the
+// 3-digit response code (2xx/3xx success, 4xx/5xx error); `text` is the final
+// response line minus its code.
+export interface CommandResult {
+  code: number;
+  text: string;
+  lines: string[];
+}
+
+// Labels imported from a Clipsal C-Bus Toolkit project file (.cbz archive or the
+// raw project .xml). Maps are keyed by C-Bus address so they can be overlaid on
+// the live tree: networks by "254", applications by "254/56", groups by the full
+// "254/56/4". This is a display-only enrichment — it never writes to C-Gate.
+export interface LabelImport {
+  source: string;                          // original filename, e.g. "5COGAN.cbz"
+  networks: Record<string, string>;        // "254" -> "Local Network"
+  applications: Record<string, string>;    // "254/56" -> "Lighting"
+  groups: Record<string, string>;          // "254/56/4" -> "Kitchen"
+  stats: { networkCount: number; groupCount: number; labelCount: number };
+}

@@ -64,9 +64,48 @@ describe('CgateService', () => {
       Buffer.from('lighting on 254/56/4\nnot-a-valid-event\n\nlighting off 254/56/5\n'),
     );
     expect(states).toEqual([
-      { address: '254/56/4', level: 255, on: true },
-      { address: '254/56/5', level: 0, on: false },
+      { address: '254/56/4', level: 255, on: true, ramping: false },
+      { address: '254/56/5', level: 0, on: false, ramping: false },
     ]);
+  });
+
+  it('flags a group as ramping, then auto-clears it if no settle event arrives', () => {
+    jest.useFakeTimers();
+    try {
+      svc = new CgateService();
+      const states: any[] = [];
+      svc.on('state', (s) => states.push(s));
+
+      (svc as any).handleEventData(Buffer.from('lighting ramp 254/56/4 128\n'));
+      expect(states[0]).toEqual({ address: '254/56/4', level: 128, on: true, ramping: true });
+
+      // No settling event: the safety timer fires and clears the ramping flag.
+      jest.advanceTimersByTime(12000);
+      expect(states[1]).toEqual({ address: '254/56/4', level: 128, on: true, ramping: false });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a settling on/off event cancels the ramping safety timer', () => {
+    jest.useFakeTimers();
+    try {
+      svc = new CgateService();
+      const states: any[] = [];
+      svc.on('state', (s) => states.push(s));
+
+      (svc as any).handleEventData(Buffer.from('lighting ramp 254/56/4 128\nlighting on 254/56/4\n'));
+      expect(states).toEqual([
+        { address: '254/56/4', level: 128, on: true, ramping: true },
+        { address: '254/56/4', level: 255, on: true, ramping: false },
+      ]);
+
+      // The settle cancelled the timer, so nothing more is emitted.
+      jest.advanceTimersByTime(20000);
+      expect(states).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('connect rejects (and does not crash) when the C-Gate is unreachable', async () => {
@@ -92,6 +131,103 @@ describe('CgateService', () => {
     // p rejects before the mock's TREEXML response is processed (I3).
     await svc.disconnect();
     await assertion;
+  });
+
+  const ref = { network: '254', application: '56', group: '4' };
+
+  it('discovers the project name from PROJECT LIST', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port });
+    expect(await svc.getProjectName()).toBe('TESTPROJ');
+  });
+
+  it('prefers an explicitly configured project over discovery', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'MINE' });
+    expect(await svc.getProjectName()).toBe('MINE');
+    expect(mock.commands).not.toContain('PROJECT LIST');
+  });
+
+  it('sends ON for full level, OFF for zero, and RAMP for a mid level', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await svc.setLevel(ref, 255);
+    await svc.setLevel(ref, 0);
+    await svc.setLevel(ref, 128, 4);
+    expect(mock.commands).toEqual(
+      expect.arrayContaining([
+        'ON //P/254/56/4',
+        'OFF //P/254/56/4',
+        'RAMP //P/254/56/4 128 4s',
+      ]),
+    );
+  });
+
+  it('sends TERMINATERAMP for a group', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await svc.terminateRamp(ref);
+    expect(mock.commands).toContain('TERMINATERAMP //P/254/56/4');
+  });
+
+  it('fetches a group detail (label via DBGET TagName, level via GET level)', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    const detail = await svc.getGroupDetail(ref);
+    expect(detail).toEqual({ label: 'Tag-4', level: 200 });
+    expect(mock.commands).toEqual(
+      expect.arrayContaining(['DBGET //P/254/56/4 TagName', 'GET //P/254/56/4 level']),
+    );
+  });
+
+  it('returns a null label for an unset (<Unused>) tag', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    const detail = await svc.getGroupDetail({ network: '254', application: '56', group: '99' });
+    expect(detail.label).toBeNull();
+    expect(detail.level).toBe(0);
+  });
+
+  it('renames a group via SET Name and saves the project', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await svc.setName(ref, 'Kitchen Lights');
+    await svc.saveProject();
+    expect(mock.commands).toContain('SET //P/254/56/4 Name Kitchen Lights');
+    expect(mock.commands).toContain('PROJECT SAVE P');
+  });
+
+  it('rejects when C-Gate returns an error response code', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await expect(svc.sendCommand('BOGUS COMMAND')).rejects.toThrow(/C-Gate 400/);
+  });
+
+  it('serializes concurrent command-channel calls without clobbering each other (M5)', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    // Fire a getTree and two commands at once; all must resolve correctly even
+    // though they share the single command stream.
+    const [tree, , ] = await Promise.all([
+      svc.getTree('254'),
+      svc.setLevel(ref, 255),
+      svc.sendCommand('TERMINATERAMP //P/254/56/4'),
+    ]);
+    expect(tree[0].address).toBe('254');
+    expect(mock.commands).toEqual(
+      expect.arrayContaining(['ON //P/254/56/4', 'TERMINATERAMP //P/254/56/4']),
+    );
+  });
+
+  it('reassembles event lines split across socket chunks (M6)', () => {
+    svc = new CgateService();
+    const states: any[] = [];
+    svc.on('state', (s) => states.push(s));
+    // A single event line delivered in two chunks must parse as one event.
+    (svc as any).handleEventData(Buffer.from('lighting on 254/5'));
+    expect(states).toHaveLength(0); // incomplete line: nothing emitted yet
+    (svc as any).handleEventData(Buffer.from('6/4\n'));
+    expect(states).toEqual([{ address: '254/56/4', level: 255, on: true, ramping: false }]);
   });
 
   it('connect() tears down the prior connection so reconnect does not double-emit state', async () => {

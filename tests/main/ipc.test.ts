@@ -1,6 +1,17 @@
 jest.mock('electron', () => ({
   ipcMain: { handle: jest.fn() },
+  dialog: { showOpenDialog: jest.fn() },
   BrowserWindow: class {},
+}));
+
+jest.mock('../../src/main/projectImport', () => ({
+  importLabelsFromFile: jest.fn().mockResolvedValue({
+    source: 'home.cbz',
+    networks: { '254': 'Home' },
+    applications: { '254/56': 'Lighting' },
+    groups: { '254/56/4': 'Kitchen' },
+    stats: { networkCount: 1, groupCount: 1, labelCount: 1 },
+  }),
 }));
 
 jest.mock('../../src/main/CgateService', () => {
@@ -9,14 +20,23 @@ jest.mock('../../src/main/CgateService', () => {
     connect = jest.fn().mockResolvedValue(undefined);
     disconnect = jest.fn().mockResolvedValue(undefined);
     getTree = jest.fn().mockResolvedValue([]);
+    setLevel = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    terminateRamp = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    setName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    saveProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    getProjectName = jest.fn().mockResolvedValue('TESTPROJ');
+    getGroupDetail = jest.fn().mockResolvedValue({ label: 'Kitchen', level: 200 });
   }
   return { CgateService: FakeService };
 });
 
-import { ipcMain } from 'electron';
+import { ipcMain, dialog } from 'electron';
 import { registerIpc, CHANNELS } from '../../src/main/ipc';
+import { importLabelsFromFile } from '../../src/main/projectImport';
 
 const handleMock = ipcMain.handle as jest.Mock;
+const showOpenDialogMock = dialog.showOpenDialog as jest.Mock;
+const importMock = importLabelsFromFile as jest.Mock;
 
 function fakeStore() {
   return {
@@ -86,5 +106,45 @@ describe('registerIpc', () => {
     expect(store.add).toHaveBeenCalledWith(input);
     expect(store.update).toHaveBeenCalledWith({ id: '1', ...input });
     expect(store.remove).toHaveBeenCalledWith('1');
+  });
+
+  it('routes control, rename, and project invocations to the service', async () => {
+    const svc = registerIpc(() => null, fakeStore());
+    const ref = { network: '254', application: '56', group: '4' };
+    await lastHandler(CHANNELS.setLevel)({}, ref, 128, 4);
+    await lastHandler(CHANNELS.terminateRamp)({}, ref);
+    await lastHandler(CHANNELS.rename)({}, ref, 'Kitchen');
+    await lastHandler(CHANNELS.projectSave)({});
+    await lastHandler(CHANNELS.projectName)({});
+    expect(svc.setLevel).toHaveBeenCalledWith(ref, 128, 4);
+    expect(svc.terminateRamp).toHaveBeenCalledWith(ref);
+    expect(svc.setName).toHaveBeenCalledWith(ref, 'Kitchen');
+    expect(svc.saveProject).toHaveBeenCalled();
+    expect(svc.getProjectName).toHaveBeenCalled();
+  });
+
+  it('routes nodes:detail to the service', async () => {
+    const svc = registerIpc(() => null, fakeStore());
+    const ref = { network: '254', application: '56', group: '4' };
+    const detail = await lastHandler(CHANNELS.nodeDetail)({}, ref);
+    expect(svc.getGroupDetail).toHaveBeenCalledWith(ref);
+    expect(detail).toEqual({ label: 'Kitchen', level: 200 });
+  });
+
+  it('project:import parses the chosen file and returns its labels', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: ['/tmp/home.cbz'] });
+    registerIpc(() => null, fakeStore());
+    const imp = await lastHandler(CHANNELS.projectImport)({});
+    expect(importMock).toHaveBeenCalledWith('/tmp/home.cbz');
+    expect(imp.groups['254/56/4']).toBe('Kitchen');
+  });
+
+  it('project:import returns null when the picker is cancelled', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: true, filePaths: [] });
+    importMock.mockClear();
+    registerIpc(() => null, fakeStore());
+    const imp = await lastHandler(CHANNELS.projectImport)({});
+    expect(imp).toBeNull();
+    expect(importMock).not.toHaveBeenCalled();
   });
 });

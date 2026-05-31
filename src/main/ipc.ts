@@ -1,7 +1,8 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { CgateService } from './CgateService';
 import { SiteStore } from './SiteStore';
-import type { ConnectOptions, Site, SiteInput } from '../shared/types';
+import { importLabelsFromFile } from './projectImport';
+import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport } from '../shared/types';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -13,7 +14,23 @@ export const CHANNELS = {
   sitesAdd: 'sites:add',
   sitesUpdate: 'sites:update',
   sitesRemove: 'sites:remove',
+  setLevel: 'control:setLevel',         // M2: switch / ramp
+  terminateRamp: 'control:terminateRamp',
+  rename: 'labels:rename',              // M3: set group Name
+  projectSave: 'project:save',          // M3: persist DB
+  projectName: 'project:name',
+  projectImport: 'project:import',      // import labels from a .cbz / .xml file
+  nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
 } as const;
+
+const openDialogOptions = {
+  title: 'Import C-Bus project labels',
+  properties: ['openFile' as const],
+  filters: [
+    { name: 'C-Bus project', extensions: ['cbz', 'xml'] },
+    { name: 'All files', extensions: ['*'] },
+  ],
+};
 
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -32,6 +49,27 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.sitesAdd, (_e, input: SiteInput) => siteStore.add(input));
   ipcMain.handle(CHANNELS.sitesUpdate, (_e, site: Site) => siteStore.update(site));
   ipcMain.handle(CHANNELS.sitesRemove, (_e, id: string) => siteStore.remove(id));
+
+  ipcMain.handle(CHANNELS.setLevel, (_e, ref: GroupRef, level: number, rampSecs?: number) =>
+    svc.setLevel(ref, level, rampSecs));
+  ipcMain.handle(CHANNELS.terminateRamp, (_e, ref: GroupRef) => svc.terminateRamp(ref));
+  ipcMain.handle(CHANNELS.rename, (_e, ref: GroupRef, name: string) => svc.setName(ref, name));
+  ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
+  ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
+  ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
+
+  // Open a native file picker for a C-Bus Toolkit project (.cbz) or raw project
+  // .xml, then parse out its labels. Returns null when the user cancels. This is
+  // a read-only enrichment: it never touches C-Gate.
+  ipcMain.handle(CHANNELS.projectImport, async (): Promise<LabelImport | null> => {
+    const win = getWindow();
+    const result = win
+      ? await dialog.showOpenDialog(win, openDialogOptions)
+      : await dialog.showOpenDialog(openDialogOptions);
+    const file = result.filePaths?.[0];
+    if (result.canceled || !file) return null;
+    return importLabelsFromFile(file);
+  });
 
   return svc;
 }

@@ -1,25 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState } from '../../shared/types';
-import { StateBadge } from './StateBadge';
+import { GroupRow, GroupActions } from './GroupRow';
 
 const INDENT = 18;
-const muted: React.CSSProperties = { color: '#888', fontWeight: 400 };
-const tag: React.CSSProperties = {
-  fontSize: 11,
-  color: '#555',
-  background: '#eef1f5',
-  border: '1px solid #dde2e9',
-  borderRadius: 4,
-  padding: '0 6px',
-  lineHeight: '16px',
-  whiteSpace: 'nowrap',
-};
 
 function Caret({ open, hasChildren }: { open: boolean; hasChildren: boolean }) {
   return (
-    <span style={{ display: 'inline-block', width: 14, color: '#999', userSelect: 'none' }}>
-      {hasChildren ? (open ? '\u25BE' : '\u25B8') : ''}
-    </span>
+    <span className="row__caret">{hasChildren ? (open ? '\u25BE' : '\u25B8') : ''}</span>
   );
 }
 
@@ -39,18 +26,9 @@ function Row({
   const clickable = hasChildren && onToggle;
   return (
     <div
+      className={clickable ? 'row row--clickable' : 'row'}
       onClick={clickable ? onToggle : undefined}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '3px 6px',
-        paddingLeft: 6 + depth * INDENT,
-        borderRadius: 4,
-        cursor: clickable ? 'pointer' : 'default',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = '#f4f6f9')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      style={{ paddingLeft: 8 + depth * INDENT }}
     >
       <Caret open={!!open} hasChildren={!!hasChildren} />
       {children}
@@ -72,7 +50,17 @@ function appMatches(a: AppNode, q: string): boolean {
   return a.groups.some((g) => groupMatches(g, q));
 }
 
-export function DeviceTree({ tree, states }: { tree: Tree; states: Record<string, GroupState> }) {
+export function DeviceTree({
+  tree,
+  states,
+  actions,
+  projectName,
+}: {
+  tree: Tree;
+  states: Record<string, GroupState>;
+  actions?: GroupActions;
+  projectName?: string | null;
+}) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
   const q = filter.trim().toLowerCase();
@@ -85,29 +73,37 @@ export function DeviceTree({ tree, states }: { tree: Tree; states: Record<string
 
   const totalUnits = useMemo(() => tree.reduce((n, net) => n + (net.units?.length ?? 0), 0), [tree]);
 
-  if (tree.length === 0) return <p style={{ color: '#999' }}>Not connected.</p>;
+  if (tree.length === 0) {
+    return (
+      <div className="empty">
+        <div className="empty__mark" aria-hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <rect x="3" y="4" width="18" height="14" rx="2" />
+            <path d="M8 20h8M12 18v2" />
+          </svg>
+        </div>
+        <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>Not connected.</strong>
+        <span>Choose a site and connect to browse the network.</span>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ fontSize: 14 }}>
+    <div className="tree">
       <input
+        className="filter"
         aria-label="Filter"
         placeholder={`Filter ${totalUnits} devices, applications, groups\u2026`}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        style={{
-          width: '100%',
-          boxSizing: 'border-box',
-          padding: '6px 10px',
-          marginBottom: 8,
-          border: '1px solid #ccd2da',
-          borderRadius: 6,
-        }}
       />
       {tree.map((net) => (
         <NetworkBlock
           key={net.address}
           net={net}
           states={states}
+          actions={actions}
+          projectName={projectName}
           q={q}
           filtering={filtering}
           isOpen={isOpen}
@@ -121,6 +117,8 @@ export function DeviceTree({ tree, states }: { tree: Tree; states: Record<string
 function NetworkBlock({
   net,
   states,
+  actions,
+  projectName,
   q,
   filtering,
   isOpen,
@@ -128,6 +126,8 @@ function NetworkBlock({
 }: {
   net: NetworkNode;
   states: Record<string, GroupState>;
+  actions?: GroupActions;
+  projectName?: string | null;
   q: string;
   filtering: boolean;
   isOpen: (k: string, d: boolean) => boolean;
@@ -146,9 +146,11 @@ function NetworkBlock({
   return (
     <div>
       <Row depth={0} open={netOpen} hasChildren onToggle={() => toggle(netKey, true)}>
-        <strong>Network {net.address}</strong>
-        {net.label && <span style={muted}>{net.label}</span>}
-        <span style={muted}>
+        <strong className="row__net">Network {net.address}</strong>
+        {(net.label || projectName) && (
+          <span className="row__netName">{net.label || projectName}</span>
+        )}
+        <span className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>
           {units.length} units &middot; {apps.length} applications
         </span>
       </Row>
@@ -173,17 +175,15 @@ function NetworkBlock({
                 <div key={app.address}>
                   <Row depth={2} open={appOpen} hasChildren={groups.length > 0} onToggle={() => toggle(appKey, true)}>
                     <span>
-                      <strong>{app.address}</strong>
+                      <strong className="row__addr">{app.address}</strong>
                       {app.label && <span> &mdash; {app.label}</span>}
                     </span>
-                    <span style={muted}>{groups.length} groups</span>
+                    <span className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>{groups.length} groups</span>
                   </Row>
                   {appOpen &&
                     groups.map((g) => (
                       <Row key={g.address} depth={3}>
-                        <span style={{ minWidth: 120, fontVariantNumeric: 'tabular-nums' }}>{g.address}</span>
-                        <span style={{ flex: 1 }}>{g.label ?? <span style={muted}>(unlabelled)</span>}</span>
-                        <StateBadge state={states[g.address]} />
+                        <GroupRow group={g} state={states[g.address]} actions={actions} />
                       </Row>
                     ))}
                 </div>
@@ -207,15 +207,15 @@ function NetworkBlock({
               return (
                 <div key={u.address}>
                   <Row depth={2} open={uOpen} hasChildren onToggle={() => toggle(uKey, false)}>
-                    <span style={{ minWidth: 36, fontVariantNumeric: 'tabular-nums' }}>
+                    <span className="row__addr" style={{ minWidth: 32 }}>
                       <strong>{u.address}</strong>
                     </span>
-                    <span style={{ flex: 1 }}>{u.name ?? <span style={muted}>(unnamed)</span>}</span>
-                    {u.category && <span style={tag}>{u.category}</span>}
-                    {u.type && <span style={muted}>{u.type}</span>}
+                    <span style={{ flex: 1, minWidth: 0 }}>{u.name ?? <span className="muted">(unnamed)</span>}</span>
+                    {u.category && <span className="tag">{u.category}</span>}
+                    {u.type && <span className="muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{u.type}</span>}
                   </Row>
                   {uOpen && (
-                    <div style={{ paddingLeft: 6 + 3 * INDENT, paddingBottom: 4, color: '#555', fontSize: 13 }}>
+                    <div style={{ paddingLeft: 8 + 3 * INDENT, paddingBottom: 6 }}>
                       <UnitDetail label="Type" value={u.type} />
                       <UnitDetail label="Firmware" value={u.firmware} />
                       <UnitDetail label="Serial" value={u.serial} />
@@ -256,21 +256,19 @@ function Section({
   return (
     <div>
       <Row depth={depth} open={sectionOpen} hasChildren onToggle={() => toggle(sectionKey, true)}>
-        <strong style={{ textTransform: 'uppercase', fontSize: 12, letterSpacing: 0.4, color: '#666' }}>
-          {label}
-        </strong>
-        <span style={muted}>{count}</span>
+        <span className="section__label">{label}</span>
+        <span className="muted">{count}</span>
       </Row>
-      {sectionOpen && (count > 0 ? children : <Row depth={depth + 1}><span style={muted}>{empty}</span></Row>)}
+      {sectionOpen && (count > 0 ? children : <Row depth={depth + 1}><span className="muted">{empty}</span></Row>)}
     </div>
   );
 }
 
 function UnitDetail({ label, value }: { label: string; value: string | null }) {
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <span style={{ minWidth: 96, color: '#888' }}>{label}</span>
-      <span>{value ?? '\u2014'}</span>
+    <div className="unitDetail">
+      <span className="unitDetail__key">{label}</span>
+      <span className="unitDetail__val">{value ?? '\u2014'}</span>
     </div>
   );
 }

@@ -2,10 +2,10 @@ import React from 'react';
 import type { GroupState } from '../../shared/types';
 
 export function StateBadge({ state }: { state?: GroupState }) {
-  if (!state) return <span style={{ color: '#999' }}>—</span>;
+  if (!state) return <span className="badge badge--unknown">&mdash;</span>;
   const pct = Math.round((state.level / 255) * 100);
   return (
-    <span style={{ color: state.on ? '#1a7f37' : '#999', fontVariantNumeric: 'tabular-nums' }}>
+    <span className={state.on ? 'badge badge--on' : 'badge badge--off'}>
       {state.on ? `ON ${pct}%` : 'OFF'}
     </span>
   );
