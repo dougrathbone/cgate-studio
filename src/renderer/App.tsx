@@ -6,7 +6,7 @@ import { DeviceTree } from './components/DeviceTree';
 import { CgateStatusPanel } from './components/CgateStatusPanel';
 import { EntityPanel } from './components/EntityPanel';
 import type { GroupActions } from './components/GroupRow';
-import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection } from '../shared/types';
+import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection, TriggerActivity } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
@@ -97,6 +97,9 @@ export function App() {
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
 
+  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastTrigger, setLastTrigger] = useState<TriggerActivity | null>(null);
+
   // Monotonic tokens: each (re)connect bumps them so stale connect/getTree work
   // and enrichment can't apply onto a newer session.
   const connectGen = useRef(0);
@@ -160,6 +163,9 @@ export function App() {
           setDirty((prev) => new Set(prev).add(g.address));
         })
         .catch((e) => setError(errMsg(e)));
+    },
+    fireScene: (g, actionSelector) => {
+      cgate().control.fireScene(refOf(g), actionSelector).catch((e) => setError(errMsg(e)));
     },
   };
 
@@ -238,7 +244,23 @@ export function App() {
     const offStatus = cgate().onStatus(setStatus);
     const offState = cgate().onState((s) =>
       setStates((prev) => ({ ...prev, [s.address]: s })));
-    return () => { offStatus(); offState(); };
+    const offTrigger = cgate().onTrigger((t) => setLastTrigger(t));
+    const offTreeChanged = cgate().onTreeChanged(() => {
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+      reconcileTimer.current = setTimeout(() => {
+        cgate().getTree('254').then((t) => {
+          const imp = importedRef.current;
+          setTree(imp ? applyImportedLabels(t, imp) : t);
+        }).catch(() => {});
+      }, 500);
+    });
+    return () => {
+      offStatus();
+      offState();
+      offTrigger();
+      offTreeChanged();
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -399,6 +421,11 @@ export function App() {
           <SiteForm onAdd={addSite} />
         </aside>
         <main className={`main${selection ? ' main--split' : ''}`}>
+          {lastTrigger && (
+            <div className="lastTrigger" title={lastTrigger.address}>
+              Fired {lastTrigger.address} → {lastTrigger.actionSelector}
+            </div>
+          )}
           <div className="main__tree">
             <DeviceTree
               tree={tree}
