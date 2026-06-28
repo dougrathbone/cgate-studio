@@ -97,3 +97,5 @@ describe('projectImport', () => {
     expect(isSafe('')).toBe(false);
   });
 });
+
+export {};

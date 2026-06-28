@@ -113,3 +113,5 @@ describe('CbusProjectParser', () => {
     await expect(make().parse(Buffer.from('xx'))).rejects.toThrow();
   });
 });
+
+export {};
