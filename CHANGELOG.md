@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.2.0](https://github.com/dougrathbone/cgate-studio/compare/v1.1.0...v1.2.0) (2026-06-28)
+
+
+### Features
+
+* **scenes:** fire C-Bus scenes from the tree via Trigger Control (application 202) — transient, no database writes
+* **scenes:** emit trigger-control events distinctly from lighting state, with a last-fired indicator
+* **scenes:** render a Fire control (action-selector + button) for trigger-control groups
+* **robustness:** reconcile the device tree on C-Gate `742` async object events (debounced re-fetch)
+* **sensors:** display live Measurement-application (228) sensor values in a read-only Sensors section
+* **robustness:** hydrate group levels with one bulk query at connect (graceful per-group fallback)
+
+### Bug Fixes
+
+* **connection:** never auto-reconnect after an intentional disconnect
+* **logging:** add a silent level and silence the logger in tests (pristine, deterministic test output)
+* **ci:** make project-parser test files modules to resolve a `tsc` TS2451 redeclaration
+
+### Documentation
+
+* document Scenes (M4) and Sensors (M5) in the README; add M4/M5 hardware-validation checklists
+
 ## [1.1.0](https://github.com/dougrathbone/cgate-studio/compare/cbus-studio-v1.0.0...cbus-studio-v1.1.0) (2026-05-31)
 
 
