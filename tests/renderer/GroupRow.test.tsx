@@ -16,8 +16,12 @@ const group: GroupNode = {
   label: 'Kitchen',
 };
 
+const triggerGroup: GroupNode = {
+  kind: 'group', address: '254/202/1', network: '254', application: '202', group: '1', label: 'Movie Scene',
+};
+
 function makeActions() {
-  return { setLevel: jest.fn(), terminateRamp: jest.fn(), rename: jest.fn() };
+  return { setLevel: jest.fn(), terminateRamp: jest.fn(), rename: jest.fn(), fireScene: jest.fn() };
 }
 
 describe('GroupRow', () => {
@@ -85,5 +89,21 @@ describe('GroupRow', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(actions.rename).not.toHaveBeenCalled();
     expect(screen.getByText('Kitchen')).toBeInTheDocument();
+  });
+});
+
+describe('GroupRow trigger group', () => {
+  it('renders a Fire button (not On/Off) for an application 202 group', () => {
+    render(<GroupRow group={triggerGroup} actions={makeActions()} />);
+    expect(screen.getByRole('button', { name: /fire/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /turn on|turn off/i })).toBeNull();
+  });
+
+  it('fires the scene with the selected action selector', () => {
+    const a = makeActions();
+    render(<GroupRow group={triggerGroup} actions={a} />);
+    fireEvent.change(screen.getByLabelText(/action selector/i), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /fire/i }));
+    expect(a.fireScene).toHaveBeenCalledWith(triggerGroup, 5);
   });
 });

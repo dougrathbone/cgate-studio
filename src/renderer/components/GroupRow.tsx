@@ -8,6 +8,7 @@ export interface GroupActions {
   setLevel: (group: GroupNode, level: number, rampSecs?: number) => void;
   terminateRamp: (group: GroupNode) => void;
   rename: (group: GroupNode, name: string) => void;
+  fireScene: (group: GroupNode, actionSelector: number) => void;
 }
 
 const RAMP_MAX = 255;
@@ -26,6 +27,8 @@ export function GroupRow({
   // Guards against a double submit: pressing Enter sets editing=false, which
   // removes the input and can fire its onBlur -> a second submitRename.
   const submitting = useRef(false);
+  const isTrigger = group.application === '202';
+  const [selector, setSelector] = useState(0);
   const on = state?.on ?? false;
   const pct = state ? Math.round((state.level / RAMP_MAX) * 100) : 0;
 
@@ -64,9 +67,30 @@ export function GroupRow({
         </span>
       )}
 
-      <StateBadge state={state} />
+      {!isTrigger && <StateBadge state={state} />}
 
-      {actions && !editing && (
+      {actions && !editing && isTrigger && (
+        <span className="group__controls" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <input
+            type="number"
+            min={0}
+            max={255}
+            className="input input--sm"
+            aria-label={`Action selector for ${group.address}`}
+            value={selector}
+            onChange={(e) => setSelector(Number(e.target.value))}
+          />
+          <button
+            type="button"
+            className="btn btn--sm"
+            aria-label={`Fire scene ${group.address}`}
+            onClick={() => actions.fireScene(group, selector)}
+          >
+            Fire
+          </button>
+        </span>
+      )}
+      {actions && !editing && !isTrigger && (
         <span className="group__controls" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           <button
             type="button"
