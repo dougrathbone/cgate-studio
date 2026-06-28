@@ -79,4 +79,16 @@ describe('LabelStore', () => {
     new LabelStore(nested).save(null, sample);
     expect(fs.existsSync(nested)).toBe(true);
   });
+
+  it('remove is a no-op when the siteId does not exist', () => {
+    const store = new LabelStore(file);
+    store.save('site-a', sample);
+    store.remove('nonexistent');
+    expect(store.get('site-a')).toEqual(sample);
+  });
+
+  it('normalizeData treats null JSON value as empty', () => {
+    fs.writeFileSync(file, 'null');
+    expect(new LabelStore(file).get(null)).toBeNull();
+  });
 });

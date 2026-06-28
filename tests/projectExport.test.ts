@@ -63,6 +63,34 @@ describe('projectExport', () => {
     expect(xml).toContain('<TagName>TEST</TagName>');
   });
 
+  it('exportLabelsFromTree handles null and empty project name without throwing', () => {
+    const xmlNull = exportLabelsFromTree(tree, null);
+    expect(xmlNull).toContain('<Installation>');
+    const xmlEmpty = exportLabelsFromTree(tree, '');
+    expect(xmlEmpty).toContain('<Installation>');
+  });
+
+  it('writes a .cbz with default basename when project name is null or empty', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cbus-export-'));
+    try {
+      // null projectName falls back to 'cbus-labels.xml' inside the archive
+      const fileNull = path.join(dir, 'out-null.cbz');
+      exportLabelsToFile(fileNull, { tree, projectName: null });
+      const zipNull = new AdmZip(fileNull);
+      const entryNull = zipNull.getEntries().find((e: { entryName: string }) => e.entryName.endsWith('.xml'));
+      expect(entryNull).toBeDefined();
+
+      // empty projectName also falls back
+      const fileEmpty = path.join(dir, 'out-empty.cbz');
+      exportLabelsToFile(fileEmpty, { tree, projectName: '' });
+      const zipEmpty = new AdmZip(fileEmpty);
+      const entryEmpty = zipEmpty.getEntries().find((e: { entryName: string }) => e.entryName.endsWith('.xml'));
+      expect(entryEmpty).toBeDefined();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('writes a .xml file and round-trips labels on re-import', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cbus-export-'));
     const file = path.join(dir, 'labels.xml');

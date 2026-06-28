@@ -318,4 +318,24 @@ describe('CgateService', () => {
     }
   });
 
+  it('emits treeChanged with the network number when a 742 line has a network address', () => {
+    svc = new CgateService();
+    const changes: any[] = [];
+    svc.on('treeChanged', (c) => changes.push(c));
+    (svc as any).handleEventData(
+      Buffer.from('742 //TESTPROJ/254/56 ObjectName "Kitchen"\n'),
+    );
+    expect(changes).toEqual([{ network: '254', raw: '742 //TESTPROJ/254/56 ObjectName "Kitchen"' }]);
+  });
+
+  it('emits treeChanged with network null when a 742 line has no address', () => {
+    svc = new CgateService();
+    const changes: any[] = [];
+    svc.on('treeChanged', (c) => changes.push(c));
+    (svc as any).handleEventData(
+      Buffer.from('742 System event with no network path\n'),
+    );
+    expect(changes).toEqual([{ network: null, raw: '742 System event with no network path' }]);
+  });
+
 });
