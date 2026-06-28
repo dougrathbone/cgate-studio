@@ -14,6 +14,7 @@ import type {
   LabelExportResult,
   TriggerActivity,
   TreeChange,
+  MeasurementState,
 } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 import type { CgateObjectParams } from '../shared/types';
@@ -46,6 +47,7 @@ const CH = {
   fireScene: 'control:fireScene',
   trigger: 'cgate:trigger',
   treeChanged: 'cgate:treeChanged',
+  measurement: 'cgate:measurement',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
@@ -72,6 +74,11 @@ contextBridge.exposeInMainWorld('cgate', {
     const h = (_e: unknown, c: TreeChange) => cb(c);
     ipcRenderer.on(CH.treeChanged, h);
     return () => ipcRenderer.removeListener(CH.treeChanged, h);
+  },
+  onMeasurement: (cb: (m: MeasurementState) => void) => {
+    const h = (_e: unknown, m: MeasurementState) => cb(m);
+    ipcRenderer.on(CH.measurement, h);
+    return () => ipcRenderer.removeListener(CH.measurement, h);
   },
   sites: {
     list: (): Promise<Site[]> => ipcRenderer.invoke(CH.sitesList),

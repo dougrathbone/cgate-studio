@@ -14,6 +14,7 @@ import type {
   CgateObjectParams,
   TriggerActivity,
   TreeChange,
+  MeasurementState,
 } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
@@ -60,6 +61,7 @@ interface CgateApi {
   onState(cb: (s: GroupState) => void): () => void;
   onTrigger(cb: (t: TriggerActivity) => void): () => void;
   onTreeChanged(cb: (c: TreeChange) => void): () => void;
+  onMeasurement(cb: (m: MeasurementState) => void): () => void;
   sites: SitesApi;
   control: ControlApi;
   labels: LabelsApi;

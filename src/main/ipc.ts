@@ -4,7 +4,7 @@ import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
 import { exportLabelsToFile } from './projectExport';
-import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange } from '../shared/types';
+import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange, MeasurementState } from '../shared/types';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -34,6 +34,7 @@ export const CHANNELS = {
   fireScene: 'control:fireScene',     // M4: fire a trigger-control scene
   trigger: 'cgate:trigger',           // main -> renderer push (trigger activity)
   treeChanged: 'cgate:treeChanged',   // main -> renderer push (742 reconcile)
+  measurement: 'cgate:measurement',   // main -> renderer push (sensor readings)
 } as const;
 
 const openDialogOptions = {
@@ -65,6 +66,7 @@ export function registerIpc(
   svc.on('state', (st) => getWindow()?.webContents.send(CHANNELS.state, st));
   svc.on('trigger', (t: TriggerActivity) => getWindow()?.webContents.send(CHANNELS.trigger, t));
   svc.on('treeChanged', (c: TreeChange) => getWindow()?.webContents.send(CHANNELS.treeChanged, c));
+  svc.on('measurement', (m: MeasurementState) => getWindow()?.webContents.send(CHANNELS.measurement, m));
 
   ipcMain.handle(CHANNELS.connect, (_e, opts: ConnectOptions) => svc.connect(opts));
   ipcMain.handle(CHANNELS.disconnect, () => svc.disconnect());
