@@ -12,6 +12,8 @@ import type {
   GroupDetail,
   LabelExportInput,
   LabelExportResult,
+  TriggerActivity,
+  TreeChange,
 } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 import type { CgateObjectParams } from '../shared/types';
@@ -41,6 +43,9 @@ const CH = {
   unitParams: 'nodes:unitParams',
   setGroupParam: 'nodes:setGroupParam',
   setUnitName: 'nodes:setUnitName',
+  fireScene: 'control:fireScene',
+  trigger: 'cgate:trigger',
+  treeChanged: 'cgate:treeChanged',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
@@ -58,6 +63,16 @@ contextBridge.exposeInMainWorld('cgate', {
     ipcRenderer.on(CH.state, h);
     return () => ipcRenderer.removeListener(CH.state, h);
   },
+  onTrigger: (cb: (t: TriggerActivity) => void) => {
+    const h = (_e: unknown, t: TriggerActivity) => cb(t);
+    ipcRenderer.on(CH.trigger, h);
+    return () => ipcRenderer.removeListener(CH.trigger, h);
+  },
+  onTreeChanged: (cb: (c: TreeChange) => void) => {
+    const h = (_e: unknown, c: TreeChange) => cb(c);
+    ipcRenderer.on(CH.treeChanged, h);
+    return () => ipcRenderer.removeListener(CH.treeChanged, h);
+  },
   sites: {
     list: (): Promise<Site[]> => ipcRenderer.invoke(CH.sitesList),
     add: (input: SiteInput): Promise<Site[]> => ipcRenderer.invoke(CH.sitesAdd, input),
@@ -73,6 +88,8 @@ contextBridge.exposeInMainWorld('cgate', {
       ipcRenderer.invoke(CH.setLevel, ref, level, rampSecs),
     terminateRamp: (ref: GroupRef): Promise<CommandResult> =>
       ipcRenderer.invoke(CH.terminateRamp, ref),
+    fireScene: (ref: GroupRef, actionSelector: number): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.fireScene, ref, actionSelector),
   },
   labels: {
     rename: (ref: GroupRef, name: string): Promise<CommandResult> =>

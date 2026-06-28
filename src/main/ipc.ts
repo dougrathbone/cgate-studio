@@ -4,7 +4,7 @@ import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
 import { exportLabelsToFile } from './projectExport';
-import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult } from '../shared/types';
+import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange } from '../shared/types';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -31,6 +31,9 @@ export const CHANNELS = {
   unitParams: 'nodes:unitParams',
   setGroupParam: 'nodes:setGroupParam',
   setUnitName: 'nodes:setUnitName',
+  fireScene: 'control:fireScene',     // M4: fire a trigger-control scene
+  trigger: 'cgate:trigger',           // main -> renderer push (trigger activity)
+  treeChanged: 'cgate:treeChanged',   // main -> renderer push (742 reconcile)
 } as const;
 
 const openDialogOptions = {
@@ -60,6 +63,8 @@ export function registerIpc(
 
   svc.on('status', (s) => getWindow()?.webContents.send(CHANNELS.status, s));
   svc.on('state', (st) => getWindow()?.webContents.send(CHANNELS.state, st));
+  svc.on('trigger', (t: TriggerActivity) => getWindow()?.webContents.send(CHANNELS.trigger, t));
+  svc.on('treeChanged', (c: TreeChange) => getWindow()?.webContents.send(CHANNELS.treeChanged, c));
 
   ipcMain.handle(CHANNELS.connect, (_e, opts: ConnectOptions) => svc.connect(opts));
   ipcMain.handle(CHANNELS.disconnect, () => svc.disconnect());
@@ -81,6 +86,8 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.setLevel, (_e, ref: GroupRef, level: number, rampSecs?: number) =>
     svc.setLevel(ref, level, rampSecs));
   ipcMain.handle(CHANNELS.terminateRamp, (_e, ref: GroupRef) => svc.terminateRamp(ref));
+  ipcMain.handle(CHANNELS.fireScene, (_e, ref: GroupRef, actionSelector: number) =>
+    svc.fireScene(ref, actionSelector));
   ipcMain.handle(CHANNELS.rename, (_e, ref: GroupRef, name: string) => svc.setName(ref, name));
   ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
   ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
