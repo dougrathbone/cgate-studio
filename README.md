@@ -74,6 +74,30 @@ its documented interface." CBus Studio is that front-end.
   enrichment** — it never writes to C-Gate. To push imported names into the
   project database, rename and `PROJECT SAVE` as above.
 
+### Scenes (M4)
+
+- **Fire C-Bus scenes** from the tree: trigger-control groups (application 202)
+  render a **Fire** control (action-selector + button) instead of on/off, sending
+  a transient trigger command — the same risk profile as M2 (no database writes,
+  no scene *definitions* are created or edited).
+- Trigger activity observed on the event stream is surfaced as a transient
+  **last-fired** indicator.
+- The tree now **reconciles live**: when another client (or Toolkit) renames,
+  creates, or modifies an object, C-Gate's async object event triggers a
+  debounced refresh so the view doesn't go stale.
+
+### Sensors (M5)
+
+- **Live measurement values** (C-Bus Measurement application 228) appear in a
+  read-only **Sensors** section and update in real time from the event stream.
+- Initial group levels are **hydrated in one bulk query** at connect (falling
+  back to per-group reads), so large networks populate faster.
+
+> **Note:** the exact C-Gate wire format for firing triggers, measurement events,
+> and the bulk-level query are validated against live hardware — see the
+> `docs/smoke-checklist-m4.md` / `-m5.md` checklists. These paths fail safe
+> (inert or graceful fallback) until confirmed on a real C-Gate.
+
 ### Reliability
 
 - Command-channel access is **serialized**, so a tree refresh can't interleave
