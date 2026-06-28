@@ -169,9 +169,13 @@ class CgateConnection extends EventEmitter {
         this._resolveDrainWaiters(false);
         this.emit('close', hadError);
         
-        // Only self-reconnect if NOT managed by a connection pool.
+        // Only self-reconnect if NOT managed by a connection pool, and never after
+        // an intentional disconnect() (isDestroyed). Reconnecting a destroyed
+        // connection would dial a gone endpoint and log after teardown — the
+        // source of "Cannot log after tests are done" flakiness and, in
+        // production, a pointless dial after the caller asked us to stop.
         // Pool-managed connections (poolIndex >= 0) are reconnected by the pool.
-        if (this.poolIndex < 0) {
+        if (this.poolIndex < 0 && !this.isDestroyed) {
             this._scheduleReconnect();
         }
     }
@@ -265,6 +269,9 @@ class CgateConnection extends EventEmitter {
     }
 
     _scheduleReconnect() {
+        if (this.isDestroyed) {
+            return; // Disconnected intentionally — never reconnect.
+        }
         if (this.reconnectTimeout) {
             return; // Already scheduled
         }
@@ -285,6 +292,7 @@ class CgateConnection extends EventEmitter {
 
         this.reconnectTimeout = setTimeout(() => {
             this.reconnectTimeout = null;
+            if (this.isDestroyed) return; // Disconnected while the timer was pending.
             this.connect();
         }, delay).unref();
     }
