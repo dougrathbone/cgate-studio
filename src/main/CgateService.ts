@@ -386,6 +386,7 @@ export class CgateService extends EventEmitter {
   }
 
   private sceneCommand(path: string, actionSelector: number): string {
+    // VALIDATE@192.168.1.22: confirm this verb against live C-Gate
     return `TRIGGER EVENT ${path} ${actionSelector}`;
   }
 
