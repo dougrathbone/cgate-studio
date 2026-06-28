@@ -66,8 +66,12 @@ describe('projectExport', () => {
   it('exportLabelsFromTree handles null and empty project name without throwing', () => {
     const xmlNull = exportLabelsFromTree(tree, null);
     expect(xmlNull).toContain('<Installation>');
+    // Verify null projectName does NOT include a Project TagName (falls back to no name, not 'cbus-labels')
+    expect(xmlNull).not.toContain('<TagName>cbus-labels</TagName>');
     const xmlEmpty = exportLabelsFromTree(tree, '');
     expect(xmlEmpty).toContain('<Installation>');
+    // Verify empty projectName does NOT include a Project TagName (falls back to no name, not 'cbus-labels')
+    expect(xmlEmpty).not.toContain('<TagName>cbus-labels</TagName>');
   });
 
   it('writes a .cbz with default basename when project name is null or empty', () => {
@@ -79,6 +83,7 @@ describe('projectExport', () => {
       const zipNull = new AdmZip(fileNull);
       const entryNull = zipNull.getEntries().find((e: { entryName: string }) => e.entryName.endsWith('.xml'));
       expect(entryNull).toBeDefined();
+      expect(entryNull?.entryName).toBe('cbus-labels.xml');
 
       // empty projectName also falls back
       const fileEmpty = path.join(dir, 'out-empty.cbz');
@@ -86,6 +91,7 @@ describe('projectExport', () => {
       const zipEmpty = new AdmZip(fileEmpty);
       const entryEmpty = zipEmpty.getEntries().find((e: { entryName: string }) => e.entryName.endsWith('.xml'));
       expect(entryEmpty).toBeDefined();
+      expect(entryEmpty?.entryName).toBe('cbus-labels.xml');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
