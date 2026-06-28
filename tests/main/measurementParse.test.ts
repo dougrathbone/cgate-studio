@@ -28,4 +28,29 @@ describe('parseMeasurementEvent', () => {
     expect(parseMeasurementEvent('')).toBeNull();
     expect(parseMeasurementEvent('measurement garbage')).toBeNull();
   });
+
+  it('returns null when passed null or undefined', () => {
+    expect(parseMeasurementEvent(null as unknown as string)).toBeNull();
+    expect(parseMeasurementEvent(undefined as unknown as string)).toBeNull();
+  });
+
+  it('returns null when the address has a // prefix but no subsequent slash', () => {
+    // e.g. "//NOSLASH" — firstSeg === -1 branch
+    expect(parseMeasurementEvent('measurement //NOSLASH 25.5 units=2')).toBeNull();
+  });
+
+  it('returns null when the address parts are non-numeric', () => {
+    expect(parseMeasurementEvent('measurement 254/abc/1 25.5')).toBeNull();
+  });
+
+  it('returns null when the value is not a finite number', () => {
+    expect(parseMeasurementEvent('measurement 254/228/1 notanumber')).toBeNull();
+  });
+
+  it('returns null when the units token has an empty value after =', () => {
+    // units= with nothing after = should produce units: null, not crash
+    const m = parseMeasurementEvent('measurement 254/228/1 25.5 units=');
+    expect(m).not.toBeNull();
+    expect(m?.units).toBeNull();
+  });
 });
