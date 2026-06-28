@@ -125,4 +125,34 @@ describe('Logger', () => {
   it('createLogger builds a configured instance', () => {
     expect(createLogger({ component: 'svc' }).component).toBe('svc');
   });
+
+  it('silent level suppresses every output level', () => {
+    const l = new Logger({ level: 'silent' });
+    l.error('x');
+    l.warn('y');
+    l.info('z');
+    expect(console.error).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+    expect(console.log).not.toHaveBeenCalled();
+    expect(l.isLevelEnabled('error')).toBe(false);
+  });
+
+  it('falls back to NODE_ENV defaults when no option or LOG_LEVEL is set', () => {
+    const prevLog = process.env.LOG_LEVEL;
+    const prevNode = process.env.NODE_ENV;
+    delete process.env.LOG_LEVEL;
+    try {
+      process.env.NODE_ENV = 'development';
+      expect(new Logger().level).toBe('debug');
+      process.env.NODE_ENV = 'test';
+      expect(new Logger().level).toBe('warn');
+      process.env.NODE_ENV = 'production';
+      expect(new Logger().level).toBe('info');
+    } finally {
+      if (prevLog === undefined) delete process.env.LOG_LEVEL;
+      else process.env.LOG_LEVEL = prevLog;
+      if (prevNode === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNode;
+    }
+  });
 });

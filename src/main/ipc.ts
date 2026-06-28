@@ -4,7 +4,7 @@ import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
 import { exportLabelsToFile } from './projectExport';
-import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult } from '../shared/types';
+import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange, MeasurementState } from '../shared/types';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -26,11 +26,16 @@ export const CHANNELS = {
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
+  networkLevels: 'nodes:networkLevels', // bulk level hydration at connect
   serverStatus: 'cgate:serverStatus',   // query live C-Gate server info
   groupParams: 'nodes:groupParams',
   unitParams: 'nodes:unitParams',
   setGroupParam: 'nodes:setGroupParam',
   setUnitName: 'nodes:setUnitName',
+  fireScene: 'control:fireScene',     // M4: fire a trigger-control scene
+  trigger: 'cgate:trigger',           // main -> renderer push (trigger activity)
+  treeChanged: 'cgate:treeChanged',   // main -> renderer push (742 reconcile)
+  measurement: 'cgate:measurement',   // main -> renderer push (sensor readings)
 } as const;
 
 const openDialogOptions = {
@@ -60,6 +65,9 @@ export function registerIpc(
 
   svc.on('status', (s) => getWindow()?.webContents.send(CHANNELS.status, s));
   svc.on('state', (st) => getWindow()?.webContents.send(CHANNELS.state, st));
+  svc.on('trigger', (t: TriggerActivity) => getWindow()?.webContents.send(CHANNELS.trigger, t));
+  svc.on('treeChanged', (c: TreeChange) => getWindow()?.webContents.send(CHANNELS.treeChanged, c));
+  svc.on('measurement', (m: MeasurementState) => getWindow()?.webContents.send(CHANNELS.measurement, m));
 
   ipcMain.handle(CHANNELS.connect, (_e, opts: ConnectOptions) => svc.connect(opts));
   ipcMain.handle(CHANNELS.disconnect, () => svc.disconnect());
@@ -81,10 +89,13 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.setLevel, (_e, ref: GroupRef, level: number, rampSecs?: number) =>
     svc.setLevel(ref, level, rampSecs));
   ipcMain.handle(CHANNELS.terminateRamp, (_e, ref: GroupRef) => svc.terminateRamp(ref));
+  ipcMain.handle(CHANNELS.fireScene, (_e, ref: GroupRef, actionSelector: number) =>
+    svc.fireScene(ref, actionSelector));
   ipcMain.handle(CHANNELS.rename, (_e, ref: GroupRef, name: string) => svc.setName(ref, name));
   ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
   ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
   ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
+  ipcMain.handle(CHANNELS.networkLevels, (_e, network: string) => svc.getNetworkLevels(network));
   ipcMain.handle(CHANNELS.serverStatus, () => svc.getServerStatus());
   ipcMain.handle(CHANNELS.groupParams, (_e, ref: GroupRef) => svc.getGroupParams(ref));
   ipcMain.handle(CHANNELS.unitParams, (_e, network: string, unit: string) => svc.getUnitParams(network, unit));

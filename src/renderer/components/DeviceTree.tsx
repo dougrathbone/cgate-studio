@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState, TreeSelection } from '../../shared/types';
+import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState, TreeSelection, MeasurementState } from '../../shared/types';
 import { GroupRow, GroupActions } from './GroupRow';
 
 const INDENT = 18;
@@ -76,6 +76,7 @@ export function selectionId(sel: TreeSelection): string {
 export function DeviceTree({
   tree,
   states,
+  measurements,
   actions,
   projectName,
   selection,
@@ -83,6 +84,7 @@ export function DeviceTree({
 }: {
   tree: Tree;
   states: Record<string, GroupState>;
+  measurements?: Record<string, MeasurementState>;
   actions?: GroupActions;
   projectName?: string | null;
   selection?: TreeSelection | null;
@@ -129,6 +131,7 @@ export function DeviceTree({
           key={net.address}
           net={net}
           states={states}
+          measurements={measurements}
           actions={actions}
           projectName={projectName}
           q={q}
@@ -146,6 +149,7 @@ export function DeviceTree({
 function NetworkBlock({
   net,
   states,
+  measurements = {},
   actions,
   projectName,
   q,
@@ -157,6 +161,7 @@ function NetworkBlock({
 }: {
   net: NetworkNode;
   states: Record<string, GroupState>;
+  measurements?: Record<string, MeasurementState>;
   actions?: GroupActions;
   projectName?: string | null;
   q: string;
@@ -272,6 +277,26 @@ function NetworkBlock({
               );
             })}
           </Section>
+
+          {/* Sensors (Measurement application 228) — read-only */}
+          {(() => {
+            const sensorEntries = Object.values(measurements).filter((m) => m.network === net.address);
+            if (sensorEntries.length === 0) return null;
+            return (
+              <Section depth={1} label="Sensors" count={sensorEntries.length} sectionKey={`${net.address}:sensors`} isOpen={isOpen} toggle={toggle} empty="No sensors.">
+                {sensorEntries
+                  .sort((a, b) => a.address.localeCompare(b.address))
+                  .map((m) => (
+                    <Row key={m.address} depth={2}>
+                      <span className="row__addr"><strong>{m.address}</strong></span>
+                      <span style={{ marginLeft: 'auto' }}>
+                        {m.value}{m.units ? ` (units ${m.units})` : ''}
+                      </span>
+                    </Row>
+                  ))}
+              </Section>
+            );
+          })()}
         </>
       )}
     </div>

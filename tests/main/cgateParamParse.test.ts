@@ -18,4 +18,13 @@ describe('cgateParamParse', () => {
       Protected: 'no',
     });
   });
+
+  it('parseObjectParams skips lines with no colon and lines with empty body after colon', () => {
+    const lines = [
+      'no-colon-here',
+      '300 //P/254/56/4: ',
+      '300 //P/254/56/4: Level=50',
+    ];
+    expect(parseObjectParams(lines)).toEqual({ Level: '50' });
+  });
 });

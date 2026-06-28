@@ -66,6 +66,39 @@ export interface GroupState {
   ramping?: boolean;      // true while a ramp is in progress (drives the Stop control)
 }
 
+// A C-Bus Measurement-application (228) reading observed on the event stream.
+// Read-only: sensors report values (temperature, light level, etc.); we never
+// write to a measurement channel.
+export interface MeasurementState {
+  address: string;        // "254/228/1" (network/application/channel)
+  network: string;
+  application: string;    // "228"
+  channel: string;
+  value: number;
+  units: string | null;   // raw units token/code when present, else null
+}
+
+// A trigger-control (application 202) event observed on the event stream. The
+// trigger application has no persisted resting state — this records the most
+// recent action selector seen for a trigger group, used for a transient
+// "last fired" indicator in the UI.
+export interface TriggerActivity {
+  address: string;        // "254/202/1"
+  network: string;
+  application: string;
+  group: string;
+  actionSelector: number; // the selector value carried by the event (0-255)
+}
+
+// A C-Gate `742` async object event (e.g. an object created/renamed/removed by
+// another client). The renderer reconciles by re-fetching the affected network.
+// `network` is the parsed network address when one is present in the line.
+// VALIDATE@live-cgate: confirm the exact 742 line format on live C-Gate.
+export interface TreeChange {
+  network: string | null;
+  raw: string;
+}
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 /** Main-process connect() was replaced by a newer connect/disconnect. */

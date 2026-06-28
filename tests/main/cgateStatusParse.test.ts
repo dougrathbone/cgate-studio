@@ -37,4 +37,23 @@ describe('cgateStatusParse', () => {
     expect(isServiceReadyLine('201 Service ready: Clipsal C-Gate Version: v2.8.0')).toBe(true);
     expect(isServiceReadyLine('200 OK.')).toBe(false);
   });
+
+  it('parseServerVersion returns null for null/undefined/empty input', () => {
+    expect(parseServerVersion(null)).toBeNull();
+    expect(parseServerVersion(undefined)).toBeNull();
+    expect(parseServerVersion('')).toBeNull();
+  });
+
+  it('parseServerVersion returns null when greeting has no Version token', () => {
+    expect(parseServerVersion('200 OK. Some other line')).toBeNull();
+  });
+
+  it('resolveActiveProject returns a synthetic entry when cached name is not in loaded list', () => {
+    const loaded = [{ name: 'OTHER', state: 'started' }];
+    expect(resolveActiveProject(loaded, 'MINE')).toEqual({ name: 'MINE', state: null });
+  });
+
+  it('resolveActiveProject returns null when no projects are loaded and no name is cached', () => {
+    expect(resolveActiveProject([], null)).toBeNull();
+  });
 });

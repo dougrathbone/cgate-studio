@@ -6,7 +6,7 @@ import { DeviceTree } from './components/DeviceTree';
 import { CgateStatusPanel } from './components/CgateStatusPanel';
 import { EntityPanel } from './components/EntityPanel';
 import type { GroupActions } from './components/GroupRow';
-import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection } from '../shared/types';
+import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection, TriggerActivity, MeasurementState } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
@@ -81,6 +81,7 @@ export function App() {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [tree, setTree] = useState<Tree>([]);
   const [states, setStates] = useState<Record<string, GroupState>>({});
+  const [measurements, setMeasurements] = useState<Record<string, MeasurementState>>({});
   const [sites, setSites] = useState<Site[]>([]);
   const [activeSiteId, setActiveSiteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +97,9 @@ export function App() {
   const [serverStatus, setServerStatus] = useState<CgateServerStatus | null>(null);
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
+
+  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastTrigger, setLastTrigger] = useState<TriggerActivity | null>(null);
 
   // Monotonic tokens: each (re)connect bumps them so stale connect/getTree work
   // and enrichment can't apply onto a newer session.
@@ -160,6 +164,9 @@ export function App() {
           setDirty((prev) => new Set(prev).add(g.address));
         })
         .catch((e) => setError(errMsg(e)));
+    },
+    fireScene: (g, actionSelector) => {
+      cgate().control.fireScene(refOf(g), actionSelector).catch((e) => setError(errMsg(e)));
     },
   };
 
@@ -238,7 +245,26 @@ export function App() {
     const offStatus = cgate().onStatus(setStatus);
     const offState = cgate().onState((s) =>
       setStates((prev) => ({ ...prev, [s.address]: s })));
-    return () => { offStatus(); offState(); };
+    const offTrigger = cgate().onTrigger((t) => setLastTrigger(t));
+    const offMeasurement = cgate().onMeasurement((m) =>
+      setMeasurements((prev) => ({ ...prev, [m.address]: m })));
+    const offTreeChanged = cgate().onTreeChanged(() => {
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+      reconcileTimer.current = setTimeout(() => {
+        cgate().getTree('254').then((t) => {
+          const imp = importedRef.current;
+          setTree(imp ? applyImportedLabels(t, imp) : t);
+        }).catch(() => {});
+      }, 500);
+    });
+    return () => {
+      offStatus();
+      offState();
+      offTrigger();
+      offMeasurement();
+      offTreeChanged();
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -270,6 +296,7 @@ export function App() {
     setConnectBusy(true);
     setActiveSiteId(site.id);
     setStates({});
+    setMeasurements({});
     setTree([]);
     setError(null);
     setProjectName(null);
@@ -290,6 +317,19 @@ export function App() {
       if (connectGen.current !== gen) return;
       const display = imp ? applyImportedLabels(t, imp) : t;
       setTree(display);
+      cgate().nodes.getNetworkLevels('254').then((levels) => {
+        if (connectGen.current !== gen) return;
+        const entries = Object.entries(levels);
+        if (entries.length > 0) {
+          setStates((prev) => {
+            const next = { ...prev };
+            for (const [address, level] of entries) {
+              if (!next[address]) next[address] = { address, level, on: level > 0, ramping: false };
+            }
+            return next;
+          });
+        }
+      }).catch(() => {});
       if (enrichGen.current === enrichGenForTree) {
         void enrichTree(collectGroups(display), enrichGenForTree);
       }
@@ -399,10 +439,16 @@ export function App() {
           <SiteForm onAdd={addSite} />
         </aside>
         <main className={`main${selection ? ' main--split' : ''}`}>
+          {lastTrigger && (
+            <div className="lastTrigger" title={lastTrigger.address}>
+              Fired {lastTrigger.address} → {lastTrigger.actionSelector}
+            </div>
+          )}
           <div className="main__tree">
             <DeviceTree
               tree={tree}
               states={states}
+              measurements={measurements}
               actions={status === 'connected' ? actions : undefined}
               projectName={projectName}
               selection={selection}

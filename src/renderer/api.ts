@@ -12,6 +12,9 @@ import type {
   LabelExportInput,
   LabelExportResult,
   CgateObjectParams,
+  TriggerActivity,
+  TreeChange,
+  MeasurementState,
 } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
@@ -27,6 +30,7 @@ interface SitesApi {
 interface ControlApi {
   setLevel(ref: GroupRef, level: number, rampSecs?: number): Promise<CommandResult>;
   terminateRamp(ref: GroupRef): Promise<CommandResult>;
+  fireScene(ref: GroupRef, actionSelector: number): Promise<CommandResult>;
 }
 
 interface LabelsApi {
@@ -42,6 +46,7 @@ interface ProjectApi {
 
 interface NodesApi {
   getGroupDetail(ref: GroupRef): Promise<GroupDetail>;
+  getNetworkLevels(network: string): Promise<Record<string, number>>;
   getGroupParams(ref: GroupRef): Promise<CgateObjectParams>;
   getUnitParams(network: string, unit: string): Promise<CgateObjectParams>;
   setGroupParam(ref: GroupRef, param: string, value: string): Promise<CommandResult>;
@@ -55,6 +60,9 @@ interface CgateApi {
   getServerStatus(): Promise<CgateServerStatus>;
   onStatus(cb: (s: ConnectionStatus) => void): () => void;
   onState(cb: (s: GroupState) => void): () => void;
+  onTrigger(cb: (t: TriggerActivity) => void): () => void;
+  onTreeChanged(cb: (c: TreeChange) => void): () => void;
+  onMeasurement(cb: (m: MeasurementState) => void): () => void;
   sites: SitesApi;
   control: ControlApi;
   labels: LabelsApi;

@@ -59,6 +59,9 @@ function installApi(initialSites: Site[] = [homeSite]) {
     }),
     onStatus: jest.fn((cb: any) => { statusCb = cb; return jest.fn(); }),
     onState: jest.fn((cb: any) => { stateCb = cb; return jest.fn(); }),
+    onTrigger: jest.fn(() => jest.fn()),
+    onMeasurement: jest.fn(() => jest.fn()),
+    onTreeChanged: jest.fn(() => jest.fn()),
     sites: {
       list: jest.fn().mockResolvedValue(initialSites),
       add: jest.fn(),
@@ -76,6 +79,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     control: {
       setLevel: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
       terminateRamp: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      fireScene: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
     },
     labels: {
       rename: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
@@ -88,6 +92,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
+      getNetworkLevels: jest.fn().mockResolvedValue({}),
       getGroupParams: jest.fn().mockResolvedValue({
         Name: 'Kitchen',
         Level: '128',
@@ -430,6 +435,9 @@ describe('App', () => {
   it('unsubscribes from bridge events on unmount', () => {
     const offStatus = jest.fn();
     const offState = jest.fn();
+    const offTrigger = jest.fn();
+    const offMeasurement = jest.fn();
+    const offTreeChanged = jest.fn();
     (window as any).cgate = {
       connect: jest.fn(),
       disconnect: jest.fn(),
@@ -437,6 +445,10 @@ describe('App', () => {
       getServerStatus: jest.fn().mockResolvedValue(null),
       onStatus: jest.fn(() => offStatus),
       onState: jest.fn(() => offState),
+      onTrigger: jest.fn(() => offTrigger),
+      onMeasurement: jest.fn(() => offMeasurement),
+      onTreeChanged: jest.fn(() => offTreeChanged),
+      project: { name: jest.fn().mockResolvedValue('TESTPROJ') },
       sites: {
         list: jest.fn().mockResolvedValue([]),
         add: jest.fn(),
@@ -450,5 +462,8 @@ describe('App', () => {
     unmount();
     expect(offStatus).toHaveBeenCalled();
     expect(offState).toHaveBeenCalled();
+    expect(offTrigger).toHaveBeenCalled();
+    expect(offMeasurement).toHaveBeenCalled();
+    expect(offTreeChanged).toHaveBeenCalled();
   });
 });

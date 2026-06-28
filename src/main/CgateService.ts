@@ -19,6 +19,7 @@ import {
   resolveActiveProject,
 } from './cgateStatusParse';
 import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
+import { parseMeasurementEvent } from './measurementParse';
 
 // Use ES imports (not require) so the bundler inlines the vendored client into
 // the main-process bundle; otherwise the relative requires resolve against
@@ -26,6 +27,7 @@ import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
 import CgateConnection from '../cgate-client/cgateConnection';
 import CBusEvent from '../cgate-client/cbusEvent';
 import { parseTreeXml } from '../cgate-client/treexml';
+import { CGATE_RESPONSE_SYSTEM_EVENT } from '../cgate-client/constants';
 
 const TREE_START = /^343/m;
 const TREE_END = /^344[ \t]/m;
@@ -373,6 +375,23 @@ export class CgateService extends EventEmitter {
     return this.sendCommand(`TERMINATERAMP ${await this.groupPath(ref)}`);
   }
 
+  // Fire a C-Bus scene by sending an action selector to a Trigger Control
+  // (application 202) group. Transient — the trigger application carries no
+  // persisted state, so this only requests the action; observed activity comes
+  // back on the event stream (see handleEventData -> 'trigger').
+  //
+  // VALIDATE@live-cgate: the exact C-Gate verb/format for firing a trigger is
+  // unverified. Confirm against a live C-Gate and adjust sceneCommand() only.
+  async fireScene(ref: GroupRef, actionSelector: number): Promise<CommandResult> {
+    const sel = Math.max(0, Math.min(255, Math.round(actionSelector)));
+    return this.sendCommand(this.sceneCommand(await this.groupPath(ref), sel));
+  }
+
+  private sceneCommand(path: string, actionSelector: number): string {
+    // VALIDATE@live-cgate: confirm this verb against a live C-Gate
+    return `TRIGGER EVENT ${path} ${actionSelector}`;
+  }
+
   // Lazily fetch a group's project-DB tag name and current level, used to enrich
   // the tree node-by-node after the initial load. Each query is independent and
   // guarded: a missing tag DB or an unsupported parameter yields null rather than
@@ -401,6 +420,32 @@ export class CgateService extends EventEmitter {
     }
 
     return { label, level };
+  }
+
+  // Fetch every group level on a network in one bulk query, returning a map of
+  // "net/app/group" -> level. Falls back to {} on error so the caller can use
+  // per-group enrichment instead.
+  //
+  // VALIDATE@live-cgate: the bulk wildcard form is a working assumption; confirm
+  // against a live C-Gate and adjust bulkLevelCommand() only.
+  async getNetworkLevels(network: string): Promise<Record<string, number>> {
+    const project = await this.getProjectName();
+    const prefix = project ? `//${project}/` : '//';
+    const out: Record<string, number> = {};
+    try {
+      const res = await this.sendCommand(this.bulkLevelCommand(`${prefix}${network}`));
+      for (const line of res.lines) {
+        const m = line.match(/\/(\d+)\/(\d+)\/(\d+):\s*level=(\d+)/i);
+        if (m) out[`${m[1]}/${m[2]}/${m[3]}`] = Number(m[4]);
+      }
+    } catch {
+      // Bulk form unsupported on this C-Gate — caller falls back per-group.
+    }
+    return out;
+  }
+
+  private bulkLevelCommand(networkPath: string): string {
+    return `GET ${networkPath}/* level`;
   }
 
   // Rename a group's label by setting its `Name` parameter. Quoted when needed.
@@ -488,14 +533,34 @@ export class CgateService extends EventEmitter {
       const line = this.eventBuf.slice(0, idx).replace(/\r$/, '');
       this.eventBuf = this.eventBuf.slice(idx + 1);
       if (!line.trim()) continue;
+      if (line.startsWith(CGATE_RESPONSE_SYSTEM_EVENT)) {
+        // 742 async object event from another client — emit a reconcile signal.
+        const m = line.match(/\/\/[^/]+\/(\d+)\b/);
+        this.emit('treeChanged', { network: m ? m[1] : null, raw: line });
+        continue;
+      }
+      const measurement = parseMeasurementEvent(line);
+      if (measurement) {
+        this.emit('measurement', measurement);
+        continue;
+      }
       // Parse/emit per line under a guard: this runs on a socket 'data' event,
       // so a single malformed line (or a throwing 'state' listener) must not
       // escape as an uncaught exception and crash the main process.
       try {
         const evt = new CBusEvent(line);
         if (!evt.isValid()) continue;
+        const network = evt.getNetwork()!;
+        const application = evt.getApplication()!;
+        const group = evt.getGroup()!;
+        const address = `${network}/${application}/${group}`;
+        if (evt.getDeviceType() === 'trigger') {
+          // Trigger-control event: report the action selector, not on/off state.
+          const actionSelector = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
+          this.emit('trigger', { address, network, application, group, actionSelector });
+          continue;
+        }
         const level = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
-        const address = `${evt.getNetwork()}/${evt.getApplication()}/${evt.getGroup()}`;
         const ramping = evt.getAction() === 'ramp';
         this.emit('state', { address, level, on: level > 0, ramping });
         this.trackRamp(address, level, ramping);

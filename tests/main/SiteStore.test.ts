@@ -53,6 +53,16 @@ describe('SiteStore', () => {
     expect(updated[0].eventPort).toBe(30000);
   });
 
+  it('updates only the matching site when multiple exist', () => {
+    const store = new SiteStore(file);
+    const [a] = store.add({ ...input, name: 'A' });
+    store.add({ ...input, name: 'B', host: '10.0.0.2' });
+    const updated = store.update({ ...a, name: 'A-Renamed' });
+    expect(updated).toHaveLength(2);
+    expect(updated.find((s) => s.id === a.id)!.name).toBe('A-Renamed');
+    expect(updated.find((s) => s.name === 'B')).toBeDefined();
+  });
+
   it('removes a site by id', () => {
     const store = new SiteStore(file);
     const [a] = store.add({ ...input, name: 'A' });

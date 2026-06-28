@@ -66,6 +66,23 @@ describe('CgateConnection (live socket)', () => {
     conn = null;
   });
 
+  it('does not reconnect after an intentional disconnect (no late dial/log)', async () => {
+    conn = new CgateConnection('command', '127.0.0.1', srv.port, {});
+    conn.connect();
+    await once(conn, 'connect');
+    conn.disconnect();
+    expect(conn.isDestroyed).toBe(true);
+    const connectSpy = jest.spyOn(conn, 'connect');
+    // A 'close' arriving after an intentional disconnect must NOT schedule a
+    // reconnect — otherwise a destroyed connection dials a gone endpoint and
+    // logs after teardown (the "Cannot log after tests are done" flake).
+    conn._handleClose(true);
+    expect(conn.reconnectTimeout).toBeNull();
+    expect(connectSpy).not.toHaveBeenCalled();
+    connectSpy.mockRestore();
+    conn = null;
+  });
+
   it('emits incoming data to listeners', async () => {
     conn = new CgateConnection('command', '127.0.0.1', srv.port, {});
     conn.connect();

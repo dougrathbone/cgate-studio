@@ -118,6 +118,12 @@ describe('CgateService', () => {
       svc.connect({ host: '127.0.0.1', commandPort: 1, eventPort: 1 }),
     ).rejects.toThrow();
     expect(svc.getStatus()).toBe('error');
+    // connect()'s failure path already tore both sockets down (isDestroyed), so
+    // no reconnect is scheduled. Settle here so any pending ECONNREFUSED
+    // error/close callbacks log INSIDE this test rather than "after tests are
+    // done" in a later, faster suite on a slow CI runner.
+    await svc.disconnect();
+    await new Promise((r) => setTimeout(r, 50));
   });
 
   it('disconnect() while a getTree is in flight rejects the getTree promise instead of hanging', async () => {
@@ -316,6 +322,26 @@ describe('CgateService', () => {
       if (safety) clearTimeout(safety);
       svc.off('state', collect);
     }
+  });
+
+  it('emits treeChanged with the network number when a 742 line has a network address', () => {
+    svc = new CgateService();
+    const changes: any[] = [];
+    svc.on('treeChanged', (c) => changes.push(c));
+    (svc as any).handleEventData(
+      Buffer.from('742 //TESTPROJ/254/56 ObjectName "Kitchen"\n'),
+    );
+    expect(changes).toEqual([{ network: '254', raw: '742 //TESTPROJ/254/56 ObjectName "Kitchen"' }]);
+  });
+
+  it('emits treeChanged with network null when a 742 line has no address', () => {
+    svc = new CgateService();
+    const changes: any[] = [];
+    svc.on('treeChanged', (c) => changes.push(c));
+    (svc as any).handleEventData(
+      Buffer.from('742 System event with no network path\n'),
+    );
+    expect(changes).toEqual([{ network: null, raw: '742 System event with no network path' }]);
   });
 
 });
