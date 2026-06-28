@@ -3,10 +3,14 @@ class Logger {
         this.component = options.component || 'cgateweb';
         this.enabled = options.enabled !== false;
         
-        // Log levels (lower number = higher priority)
+        // Log levels (lower number = higher priority). 'silent' sits below
+        // 'error' so that selecting it suppresses every level (used by the test
+        // suite via LOG_LEVEL=silent to keep output pristine and avoid async
+        // "cannot log after tests are done" noise from socket teardown).
         this.levels = {
+            silent: -1,
             error: 0,
-            warn: 1, 
+            warn: 1,
             info: 2,
             debug: 3,
             trace: 4 // New trace level for detailed debugging
