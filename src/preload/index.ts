@@ -39,6 +39,7 @@ const CH = {
   projectImport: 'project:import',
   projectExport: 'project:export',
   nodeDetail: 'nodes:detail',
+  networkLevels: 'nodes:networkLevels',
   serverStatus: 'cgate:serverStatus',
   groupParams: 'nodes:groupParams',
   unitParams: 'nodes:unitParams',
@@ -112,6 +113,8 @@ contextBridge.exposeInMainWorld('cgate', {
   nodes: {
     getGroupDetail: (ref: GroupRef): Promise<GroupDetail> =>
       ipcRenderer.invoke(CH.nodeDetail, ref),
+    getNetworkLevels: (network: string): Promise<Record<string, number>> =>
+      ipcRenderer.invoke(CH.networkLevels, network),
     getGroupParams: (ref: GroupRef): Promise<CgateObjectParams> =>
       ipcRenderer.invoke(CH.groupParams, ref),
     getUnitParams: (network: string, unit: string): Promise<CgateObjectParams> =>

@@ -317,6 +317,19 @@ export function App() {
       if (connectGen.current !== gen) return;
       const display = imp ? applyImportedLabels(t, imp) : t;
       setTree(display);
+      cgate().nodes.getNetworkLevels('254').then((levels) => {
+        if (connectGen.current !== gen) return;
+        const entries = Object.entries(levels);
+        if (entries.length > 0) {
+          setStates((prev) => {
+            const next = { ...prev };
+            for (const [address, level] of entries) {
+              if (!next[address]) next[address] = { address, level, on: level > 0, ramping: false };
+            }
+            return next;
+          });
+        }
+      }).catch(() => {});
       if (enrichGen.current === enrichGenForTree) {
         void enrichTree(collectGroups(display), enrichGenForTree);
       }

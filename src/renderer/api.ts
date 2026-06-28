@@ -46,6 +46,7 @@ interface ProjectApi {
 
 interface NodesApi {
   getGroupDetail(ref: GroupRef): Promise<GroupDetail>;
+  getNetworkLevels(network: string): Promise<Record<string, number>>;
   getGroupParams(ref: GroupRef): Promise<CgateObjectParams>;
   getUnitParams(network: string, unit: string): Promise<CgateObjectParams>;
   setGroupParam(ref: GroupRef, param: string, value: string): Promise<CommandResult>;

@@ -92,6 +92,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
+      getNetworkLevels: jest.fn().mockResolvedValue({}),
       getGroupParams: jest.fn().mockResolvedValue({
         Name: 'Kitchen',
         Level: '128',

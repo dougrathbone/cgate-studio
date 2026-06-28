@@ -26,6 +26,7 @@ export const CHANNELS = {
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
+  networkLevels: 'nodes:networkLevels', // bulk level hydration at connect
   serverStatus: 'cgate:serverStatus',   // query live C-Gate server info
   groupParams: 'nodes:groupParams',
   unitParams: 'nodes:unitParams',
@@ -94,6 +95,7 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
   ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
   ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
+  ipcMain.handle(CHANNELS.networkLevels, (_e, network: string) => svc.getNetworkLevels(network));
   ipcMain.handle(CHANNELS.serverStatus, () => svc.getServerStatus());
   ipcMain.handle(CHANNELS.groupParams, (_e, ref: GroupRef) => svc.getGroupParams(ref));
   ipcMain.handle(CHANNELS.unitParams, (_e, network: string, unit: string) => svc.getUnitParams(network, unit));

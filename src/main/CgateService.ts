@@ -422,6 +422,32 @@ export class CgateService extends EventEmitter {
     return { label, level };
   }
 
+  // Fetch every group level on a network in one bulk query, returning a map of
+  // "net/app/group" -> level. Falls back to {} on error so the caller can use
+  // per-group enrichment instead.
+  //
+  // VALIDATE@live-cgate: the bulk wildcard form is a working assumption; confirm
+  // against a live C-Gate and adjust bulkLevelCommand() only.
+  async getNetworkLevels(network: string): Promise<Record<string, number>> {
+    const project = await this.getProjectName();
+    const prefix = project ? `//${project}/` : '//';
+    const out: Record<string, number> = {};
+    try {
+      const res = await this.sendCommand(this.bulkLevelCommand(`${prefix}${network}`));
+      for (const line of res.lines) {
+        const m = line.match(/\/(\d+)\/(\d+)\/(\d+):\s*level=(\d+)/i);
+        if (m) out[`${m[1]}/${m[2]}/${m[3]}`] = Number(m[4]);
+      }
+    } catch {
+      // Bulk form unsupported on this C-Gate — caller falls back per-group.
+    }
+    return out;
+  }
+
+  private bulkLevelCommand(networkPath: string): string {
+    return `GET ${networkPath}/* level`;
+  }
+
   // Rename a group's label by setting its `Name` parameter. Quoted when needed.
   async setName(ref: GroupRef, name: string): Promise<CommandResult> {
     const path = await this.groupPath(ref);
