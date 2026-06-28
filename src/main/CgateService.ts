@@ -378,15 +378,15 @@ export class CgateService extends EventEmitter {
   // persisted state, so this only requests the action; observed activity comes
   // back on the event stream (see handleEventData -> 'trigger').
   //
-  // VALIDATE@192.168.1.22: the exact C-Gate verb/format for firing a trigger is
-  // unverified. Confirm against the live C-Gate and adjust sceneCommand() only.
+  // VALIDATE@live-cgate: the exact C-Gate verb/format for firing a trigger is
+  // unverified. Confirm against a live C-Gate and adjust sceneCommand() only.
   async fireScene(ref: GroupRef, actionSelector: number): Promise<CommandResult> {
     const sel = Math.max(0, Math.min(255, Math.round(actionSelector)));
     return this.sendCommand(this.sceneCommand(await this.groupPath(ref), sel));
   }
 
   private sceneCommand(path: string, actionSelector: number): string {
-    // VALIDATE@192.168.1.22: confirm this verb against live C-Gate
+    // VALIDATE@live-cgate: confirm this verb against a live C-Gate
     return `TRIGGER EVENT ${path} ${actionSelector}`;
   }
 
