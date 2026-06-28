@@ -19,6 +19,7 @@ import {
   resolveActiveProject,
 } from './cgateStatusParse';
 import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
+import { parseMeasurementEvent } from './measurementParse';
 
 // Use ES imports (not require) so the bundler inlines the vendored client into
 // the main-process bundle; otherwise the relative requires resolve against
@@ -510,6 +511,11 @@ export class CgateService extends EventEmitter {
         // 742 async object event from another client — emit a reconcile signal.
         const m = line.match(/\/\/[^/]+\/(\d+)\b/);
         this.emit('treeChanged', { network: m ? m[1] : null, raw: line });
+        continue;
+      }
+      const measurement = parseMeasurementEvent(line);
+      if (measurement) {
+        this.emit('measurement', measurement);
         continue;
       }
       // Parse/emit per line under a guard: this runs on a socket 'data' event,
