@@ -15,7 +15,7 @@ function installFakeCgate() {
   const getTree = jest.fn().mockResolvedValue(TREE);
   (window as any).cgate = {
     sites: { list: jest.fn().mockResolvedValue([]), getImportedLabels: jest.fn().mockResolvedValue(null) },
-    onStatus: () => () => {}, onState: () => () => {}, onTrigger: () => () => {},
+    onStatus: () => () => {}, onState: () => () => {}, onTrigger: () => () => {}, onMeasurement: () => () => {},
     onTreeChanged: (cb: (c: TreeChange) => void) => { treeChangedCb = cb; return () => {}; },
     getTree, project: { name: jest.fn().mockResolvedValue('TESTPROJ') },
   };

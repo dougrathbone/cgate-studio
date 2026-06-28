@@ -6,7 +6,7 @@ import { DeviceTree } from './components/DeviceTree';
 import { CgateStatusPanel } from './components/CgateStatusPanel';
 import { EntityPanel } from './components/EntityPanel';
 import type { GroupActions } from './components/GroupRow';
-import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection, TriggerActivity } from '../shared/types';
+import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection, TriggerActivity, MeasurementState } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 
@@ -81,6 +81,7 @@ export function App() {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [tree, setTree] = useState<Tree>([]);
   const [states, setStates] = useState<Record<string, GroupState>>({});
+  const [measurements, setMeasurements] = useState<Record<string, MeasurementState>>({});
   const [sites, setSites] = useState<Site[]>([]);
   const [activeSiteId, setActiveSiteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -245,6 +246,8 @@ export function App() {
     const offState = cgate().onState((s) =>
       setStates((prev) => ({ ...prev, [s.address]: s })));
     const offTrigger = cgate().onTrigger((t) => setLastTrigger(t));
+    const offMeasurement = cgate().onMeasurement((m) =>
+      setMeasurements((prev) => ({ ...prev, [m.address]: m })));
     const offTreeChanged = cgate().onTreeChanged(() => {
       if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
       reconcileTimer.current = setTimeout(() => {
@@ -258,6 +261,7 @@ export function App() {
       offStatus();
       offState();
       offTrigger();
+      offMeasurement();
       offTreeChanged();
       if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
     };
@@ -292,6 +296,7 @@ export function App() {
     setConnectBusy(true);
     setActiveSiteId(site.id);
     setStates({});
+    setMeasurements({});
     setTree([]);
     setError(null);
     setProjectName(null);
@@ -430,6 +435,7 @@ export function App() {
             <DeviceTree
               tree={tree}
               states={states}
+              measurements={measurements}
               actions={status === 'connected' ? actions : undefined}
               projectName={projectName}
               selection={selection}

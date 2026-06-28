@@ -60,6 +60,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     onStatus: jest.fn((cb: any) => { statusCb = cb; return jest.fn(); }),
     onState: jest.fn((cb: any) => { stateCb = cb; return jest.fn(); }),
     onTrigger: jest.fn(() => jest.fn()),
+    onMeasurement: jest.fn(() => jest.fn()),
     onTreeChanged: jest.fn(() => jest.fn()),
     sites: {
       list: jest.fn().mockResolvedValue(initialSites),
@@ -434,6 +435,7 @@ describe('App', () => {
     const offStatus = jest.fn();
     const offState = jest.fn();
     const offTrigger = jest.fn();
+    const offMeasurement = jest.fn();
     const offTreeChanged = jest.fn();
     (window as any).cgate = {
       connect: jest.fn(),
@@ -443,6 +445,7 @@ describe('App', () => {
       onStatus: jest.fn(() => offStatus),
       onState: jest.fn(() => offState),
       onTrigger: jest.fn(() => offTrigger),
+      onMeasurement: jest.fn(() => offMeasurement),
       onTreeChanged: jest.fn(() => offTreeChanged),
       project: { name: jest.fn().mockResolvedValue('TESTPROJ') },
       sites: {
@@ -459,6 +462,7 @@ describe('App', () => {
     expect(offStatus).toHaveBeenCalled();
     expect(offState).toHaveBeenCalled();
     expect(offTrigger).toHaveBeenCalled();
+    expect(offMeasurement).toHaveBeenCalled();
     expect(offTreeChanged).toHaveBeenCalled();
   });
 });
