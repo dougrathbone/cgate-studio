@@ -66,6 +66,18 @@ export interface GroupState {
   ramping?: boolean;      // true while a ramp is in progress (drives the Stop control)
 }
 
+// A trigger-control (application 202) event observed on the event stream. The
+// trigger application has no persisted resting state — this records the most
+// recent action selector seen for a trigger group, used for a transient
+// "last fired" indicator in the UI.
+export interface TriggerActivity {
+  address: string;        // "254/202/1"
+  network: string;
+  application: string;
+  group: string;
+  actionSelector: number; // the selector value carried by the event (0-255)
+}
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 /** Main-process connect() was replaced by a newer connect/disconnect. */

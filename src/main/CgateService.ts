@@ -511,8 +511,17 @@ export class CgateService extends EventEmitter {
       try {
         const evt = new CBusEvent(line);
         if (!evt.isValid()) continue;
+        const network = evt.getNetwork()!;
+        const application = evt.getApplication()!;
+        const group = evt.getGroup()!;
+        const address = `${network}/${application}/${group}`;
+        if (evt.getDeviceType() === 'trigger') {
+          // Trigger-control event: report the action selector, not on/off state.
+          const actionSelector = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
+          this.emit('trigger', { address, network, application, group, actionSelector });
+          continue;
+        }
         const level = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
-        const address = `${evt.getNetwork()}/${evt.getApplication()}/${evt.getGroup()}`;
         const ramping = evt.getAction() === 'ramp';
         this.emit('state', { address, level, on: level > 0, ramping });
         this.trackRamp(address, level, ramping);
