@@ -1,63 +1,36 @@
 name: Release
 
-# Automated semantic-versioning releases driven by Conventional Commits.
+# Manual releases — no automated version bumping.
 #
-# How it works:
-#   1. release-please watches `main`. As `feat:` / `fix:` / etc. commits land it
-#      maintains a single "release PR" that bumps the version in package.json
-#      (semver: feat -> minor, fix -> patch, `!`/BREAKING CHANGE -> major) and
-#      regenerates CHANGELOG.md.
-#   2. Merging that PR tags the commit `vX.Y.Z` and publishes a GitHub Release.
-#   3. Native macOS (.dmg + .zip) and Windows (NSIS .exe) installers are built on
-#      their respective runners and attached to that release in one upload step.
+# How to cut a release:
+#   1. Bump "version" in package.json and add a CHANGELOG.md entry, commit to main.
+#   2. Tag the commit and push the tag:
+#        git tag v1.3.0 && git push origin v1.3.0
+#   3. This workflow builds the macOS (.dmg + .zip) and Windows (NSIS .exe)
+#      installers and publishes a GitHub Release for the tag with them attached.
 #
-# Manual runs (workflow_dispatch) build installers as workflow artifacts only —
-# useful for smoke-testing packaging without cutting a release.
-#
-# Installer builds live in this workflow (gated on `release_created`) on purpose.
-# A tag pushed by release-please uses the default GITHUB_TOKEN, which does not
-# re-trigger tag/`release`-triggered workflows — a separate tag-only workflow
-# would never fire.
+# You can also run it manually (workflow_dispatch) against an existing tag to
+# (re)build and (re)attach installers — e.g. if a build needs to be redone.
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to attach installers to (e.g. v1.1.0)
+        description: Tag to build and publish a release for (e.g. v1.3.0). The tag must already exist.
         required: true
-        default: v1.1.0
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  release-please:
-    name: Prepare release
-    runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-    steps:
-      - name: Run release-please
-        id: release
-        uses: googleapis/release-please-action@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-
   build-installer:
     name: Build installer (${{ matrix.platform }})
-    needs: release-please
-    # release-please may fail when Actions cannot open PRs; still build on manual runs.
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.release_created == 'true') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -71,6 +44,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Build the exact tagged commit (tag push -> ref_name; manual -> input).
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -108,11 +84,8 @@ jobs:
 
   publish-installers:
     name: Attach installers to GitHub Release
-    needs: [release-please, build-installer]
-    if: >-
-      ${{ always() && needs.build-installer.result == 'success'
-      && (needs.release-please.outputs.release_created == 'true'
-          || github.event_name == 'workflow_dispatch') }}
+    needs: build-installer
+    if: ${{ always() && needs.build-installer.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download installer artifacts
@@ -125,10 +98,12 @@ jobs:
       - name: List assets to publish
         run: find installers -type f | sort
 
-      - name: Upload installers to the release
+      - name: Publish release with installers attached
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.release-please.outputs.tag_name || github.event.inputs.tag }}
+          # Tag push -> ref_name; manual run -> the tag input. Creates the release
+          # if it doesn't exist yet, otherwise attaches to the existing one.
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             installers/**/*.dmg
             installers/**/*.exe

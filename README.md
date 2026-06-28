@@ -182,29 +182,28 @@ npm run dist       # installer(s) for the current host platform
 
 Each platform's installer must be built on that platform — the **Release**
 GitHub Actions workflow does this on macOS and Windows runners and attaches the
-results to the GitHub Release (see *Versioning & releases* below). You can also
-trigger that workflow manually (**Actions → Release → Run workflow**) to produce
-installer artifacts without cutting a release.
+results to the GitHub Release for a tag (see *Versioning & releases* below).
 
 ## Versioning & releases
 
-Releases follow [Semantic Versioning](https://semver.org/) and are automated with
-[release-please](https://github.com/googleapis/release-please) on top of
-[Conventional Commits](https://www.conventionalcommits.org/):
+Releases follow [Semantic Versioning](https://semver.org/) and are cut
+**manually** — there is no automated version bumping:
 
-- Commit to `main` using conventional prefixes — `feat:` (→ minor bump), `fix:`
-  (→ patch), and `feat!:` / `fix!:` / a `BREAKING CHANGE:` footer (→ major).
-- release-please opens and maintains a **release PR** that bumps the version in
-  `package.json` and updates [`CHANGELOG.md`](CHANGELOG.md). Review and merge it
-  when you're ready to ship.
-- Merging the release PR tags the commit `vX.Y.Z`, publishes a **GitHub Release**,
-  and builds **macOS** (`.dmg` + `.zip`, universal Apple Silicon + Intel) and
-  **Windows** (`.exe` NSIS) installers on native CI runners, attached to that
-  release for download.
+1. Bump `"version"` in [`package.json`](package.json) and add an entry to
+   [`CHANGELOG.md`](CHANGELOG.md); commit to `main`.
+2. Tag that commit and push the tag:
+   ```bash
+   git tag v1.3.0
+   git push origin v1.3.0
+   ```
+3. Pushing a `v*` tag triggers the **Release** workflow, which builds **macOS**
+   (`.dmg` + `.zip`, universal Apple Silicon + Intel) and **Windows** (`.exe`
+   NSIS) installers on native runners and publishes a **GitHub Release** for the
+   tag with the installers attached.
 
-No manual tagging, version bumping, or changelog editing is required; everything
-flows from the commit messages. The workflow uses the built-in `GITHUB_TOKEN`, so
-there are no extra secrets to configure.
+To (re)build installers for an existing tag, run the workflow manually
+(**Actions → Release → Run workflow**) and supply the tag. The workflow uses the
+built-in `GITHUB_TOKEN`, so there are no extra secrets to configure.
 
 ## Architecture
 

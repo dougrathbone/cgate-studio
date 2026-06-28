@@ -14,3 +14,6 @@ coverage/
 # Internal planning artifacts kept out of the public repo
 docs/specs/
 docs/plans/
+
+# Local Claude Code overrides (personal, not committed)
+.claude/settings.local.json
