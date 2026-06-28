@@ -78,6 +78,15 @@ export interface TriggerActivity {
   actionSelector: number; // the selector value carried by the event (0-255)
 }
 
+// A C-Gate `742` async object event (e.g. an object created/renamed/removed by
+// another client). The renderer reconciles by re-fetching the affected network.
+// `network` is the parsed network address when one is present in the line.
+// VALIDATE@live-cgate: confirm the exact 742 line format on live C-Gate.
+export interface TreeChange {
+  network: string | null;
+  raw: string;
+}
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 /** Main-process connect() was replaced by a newer connect/disconnect. */

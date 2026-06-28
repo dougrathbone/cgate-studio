@@ -26,6 +26,7 @@ import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
 import CgateConnection from '../cgate-client/cgateConnection';
 import CBusEvent from '../cgate-client/cbusEvent';
 import { parseTreeXml } from '../cgate-client/treexml';
+import { CGATE_RESPONSE_SYSTEM_EVENT } from '../cgate-client/constants';
 
 const TREE_START = /^343/m;
 const TREE_END = /^344[ \t]/m;
@@ -505,6 +506,12 @@ export class CgateService extends EventEmitter {
       const line = this.eventBuf.slice(0, idx).replace(/\r$/, '');
       this.eventBuf = this.eventBuf.slice(idx + 1);
       if (!line.trim()) continue;
+      if (line.startsWith(CGATE_RESPONSE_SYSTEM_EVENT)) {
+        // 742 async object event from another client — emit a reconcile signal.
+        const m = line.match(/\/\/[^/]+\/(\d+)\b/);
+        this.emit('treeChanged', { network: m ? m[1] : null, raw: line });
+        continue;
+      }
       // Parse/emit per line under a guard: this runs on a socket 'data' event,
       // so a single malformed line (or a throwing 'state' listener) must not
       // escape as an uncaught exception and crash the main process.
