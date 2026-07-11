@@ -42,17 +42,18 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           socket.write(fixture.endsWith('\n') ? fixture : fixture + '\n');
         } else if (/^PROJECT LIST/i.test(line)) {
           commands.push(line);
-          socket.write('123 project=TESTPROJ state=started\r\n200 OK.\r\n');
+          // C-Gate 3.x style: terminal space-form line, no trailing 200 OK.
+          socket.write('123 project=TESTPROJ state=started\r\n');
         } else if (/^PROJECT DIR/i.test(line)) {
           commands.push(line);
-          socket.write('123-project=TESTPROJ\r\n123 project=ARCHIVE\r\n200 OK.\r\n');
+          socket.write('123-project=TESTPROJ\r\n123 project=ARCHIVE\r\n');
         } else if (/^PROJECT (LOAD|START|USE|SAVE)\b/i.test(line)) {
           commands.push(line);
           socket.write('200 OK.\r\n');
         } else if (/^NET LIST/i.test(line)) {
           commands.push(line);
           socket.write(
-            '131 network=254 State=ok InterfaceState=running SyncState=idle\r\n200 OK.\r\n',
+            '131 network=254 State=ok InterfaceState=running SyncState=idle\r\n',
           );
         } else if (/^NET OPEN\b/i.test(line)) {
           commands.push(line);
@@ -76,11 +77,19 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           socket.write(`300 ${objPath}: ${param}=${val}\r\n`);
         } else if (/^DBGET /i.test(line)) {
           commands.push(line);
-          const objPath = line.split(/\s+/)[1] ?? '';
+          // Accept C-Gate 3.x `DBGET path/TagName` and older `DBGET path TagName`.
+          const rest = line.replace(/^DBGET\s+/i, '').trim();
+          const objPath = /\s/.test(rest)
+            ? rest.split(/\s+/)[0]
+            : rest.replace(/\/TagName$/i, '');
           const group = objPath.split('/').pop() ?? '';
           // Group 99 simulates an unset tag; others return a deterministic label.
           const tag = group === '99' ? '<Unused>' : `Tag-${group}`;
-          socket.write(`300 ${objPath} TagName="${tag}"\r\n`);
+          if (/\/TagName$/i.test(rest.split(/\s+/)[0] ?? '')) {
+            socket.write(`342 ${objPath.replace(/^\/\//, '')}/TagName=${tag}\r\n`);
+          } else {
+            socket.write(`300 ${objPath} TagName="${tag}"\r\n`);
+          }
         } else if (/^GET .+\s+\*/i.test(line)) {
           commands.push(line);
           const objPath = line.split(/\s+/)[1] ?? '';

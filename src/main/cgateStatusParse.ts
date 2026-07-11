@@ -11,10 +11,13 @@ export function parseServerVersion(greeting: string | null | undefined): string 
 export function parseProjectLines(lines: string[]): CgateProjectInfo[] {
   const out: CgateProjectInfo[] = [];
   for (const line of lines) {
-    const nameM = line.match(/project=(\S+)/i);
+    const nameM = line.match(/project=(?:"([^"]+)"|(\S+))/i);
     if (!nameM) continue;
-    const stateM = line.match(/state=(\S+)/i);
-    out.push({ name: nameM[1], state: stateM?.[1] ?? null });
+    const stateM = line.match(/state=(?:"([^"]+)"|(\S+))/i);
+    out.push({
+      name: nameM[1] ?? nameM[2],
+      state: stateM ? (stateM[1] ?? stateM[2]) : null,
+    });
   }
   return out;
 }

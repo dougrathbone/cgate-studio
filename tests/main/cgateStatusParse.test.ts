@@ -22,6 +22,12 @@ describe('cgateStatusParse', () => {
     ]);
   });
 
+  it('parseProjectLines strips quotes used by PROJECT DIRFULL', () => {
+    expect(parseProjectLines([
+      '123 project="5COGAN" desc="5COGAN"',
+    ])).toEqual([{ name: '5COGAN', state: null }]);
+  });
+
   it('resolveActiveProject prefers the cached project name', () => {
     const loaded = [{ name: 'TESTPROJ', state: 'started' }, { name: 'OTHER', state: 'stopped' }];
     expect(resolveActiveProject(loaded, 'TESTPROJ')).toEqual({ name: 'TESTPROJ', state: 'started' });

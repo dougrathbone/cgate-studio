@@ -212,7 +212,7 @@ describe('CgateService', () => {
     const detail = await svc.getGroupDetail(ref);
     expect(detail).toEqual({ label: 'Tag-4', level: 200 });
     expect(mock.commands).toEqual(
-      expect.arrayContaining(['DBGET //P/254/56/4 TagName', 'GET //P/254/56/4 level']),
+      expect.arrayContaining(['DBGET //P/254/56/4/TagName', 'GET //P/254/56/4 level']),
     );
   });
 

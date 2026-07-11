@@ -40,11 +40,11 @@ describe('mock C-Gate', () => {
 
   it('lists projects on disk and loaded projects', async () => {
     const mock = await startMockCgate();
-    const dir = await sendAndCollect(mock.port, 'PROJECT DIR', (buf) => /200 /.test(buf));
+    const dir = await sendAndCollect(mock.port, 'PROJECT DIR', (buf) => /123 project=ARCHIVE/i.test(buf));
     expect(dir).toMatch(/project=TESTPROJ/i);
     expect(dir).toMatch(/project=ARCHIVE/i);
 
-    const list = await sendAndCollect(mock.port, 'PROJECT LIST', (buf) => /200 /.test(buf));
+    const list = await sendAndCollect(mock.port, 'PROJECT LIST', (buf) => /123 project=TESTPROJ/i.test(buf));
     expect(list).toMatch(/project=TESTPROJ.*state=started/i);
     await mock.close();
   });
@@ -55,7 +55,7 @@ describe('mock C-Gate', () => {
       const res = await sendAndCollect(mock.port, cmd, (buf) => /200 /.test(buf));
       expect(res).toMatch(/200 OK/i);
     }
-    const nets = await sendAndCollect(mock.port, 'NET LIST', (buf) => /200 /.test(buf));
+    const nets = await sendAndCollect(mock.port, 'NET LIST', (buf) => /131 network=254/i.test(buf));
     expect(nets).toMatch(/network=254/i);
     expect(mock.commands).toEqual(
       expect.arrayContaining([

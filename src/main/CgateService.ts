@@ -371,21 +371,39 @@ export class CgateService extends EventEmitter {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        if (listIdle) { clearTimeout(listIdle); listIdle = null; }
         if (this.commandConsumer === consume) this.commandConsumer = null;
         this.pendingCommands.delete(cancel);
         apply();
       };
 
       // Collect response lines until a terminal one ("CODE "); continuation
-      // lines ("CODE-") accumulate first. List commands (PROJECT LIST/DIR,
-      // NET LIST) emit multiple item lines before the final status.
+      // lines ("CODE-") accumulate first.
+      //
+      // List commands (PROJECT LIST/DIR, NET LIST) are special on C-Gate 3.x:
+      // the final space-form item line IS the terminal (no trailing 200 OK).
+      // Some older servers emit several space-form item lines then `200 OK`.
+      // Treat space-form list items as tentatively terminal after a short idle,
+      // but settle immediately on a real status line (200 / 124 / errors).
+      let listIdle: ReturnType<typeof setTimeout> | null = null;
       const isListItem = (line: string) =>
         (/^12[34]\s/i.test(line) && /project=/i.test(line)) ||
         (/^131\s/i.test(line) && /network=/i.test(line));
       const consume = (line: string) => {
         lines.push(line);
-        if (isListItem(line)) return;
+        if (isListItem(line)) {
+          if (listIdle) clearTimeout(listIdle);
+          const code = parseInt(line.slice(0, 3), 10);
+          const text = line.slice(4);
+          listIdle = setTimeout(() => {
+            listIdle = null;
+            this.noteActivity('rx', lines.join(' | '));
+            settle(() => resolve({ code, text, lines: [...lines] }));
+          }, 40);
+          return;
+        }
         if (!CMD_TERMINAL.test(line)) return;
+        if (listIdle) { clearTimeout(listIdle); listIdle = null; }
         const code = parseInt(line.slice(0, 3), 10);
         const text = line.slice(4);
         if (code >= CMD_ERROR_CODE) {
@@ -413,8 +431,8 @@ export class CgateService extends EventEmitter {
     if (this.projectName != null) return this.projectName;
     try {
       const res = await this.sendCommand('PROJECT LIST');
-      const m = res.lines.join('\n').match(/project=(\S+)/i);
-      this.projectName = m ? m[1] : '';
+      const m = res.lines.join('\n').match(/project=(?:"([^"]+)"|(\S+))/i);
+      this.projectName = m ? (m[1] ?? m[2]) : '';
     } catch {
       this.projectName = '';
     }
@@ -567,8 +585,18 @@ export class CgateService extends EventEmitter {
     let level: number | null = null;
 
     try {
-      const res = await this.sendCommand(`DBGET ${path} TagName`);
-      const m = res.lines.join('\n').match(/TagName="([^"]*)"/i);
+      // C-Gate 3.x wants `DBGET //proj/net/app/group/TagName` (slash form).
+      // Older servers accept `DBGET //proj/net/app/group TagName` (space form).
+      let res: CommandResult;
+      try {
+        res = await this.sendCommand(`DBGET ${path}/TagName`);
+      } catch {
+        res = await this.sendCommand(`DBGET ${path} TagName`);
+      }
+      const blob = res.lines.join('\n');
+      const m =
+        blob.match(/TagName="([^"]*)"/i) ||
+        blob.match(/TagName=([^\r\n]+)/i);
       const tag = m?.[1]?.trim();
       // C-Gate uses "<Unused>" (and blanks) for groups with no real label.
       label = tag && tag !== '<Unused>' ? tag : null;

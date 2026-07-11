@@ -17,3 +17,4 @@ docs/plans/
 
 # Local Claude Code overrides (personal, not committed)
 .claude/settings.local.json
+.superpowers/
