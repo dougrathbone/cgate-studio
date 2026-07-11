@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cgate } from '../api';
+import { CloseButton } from './CloseButton';
 import type { GroupActions } from './GroupRow';
 import type { GroupNode, GroupState, TreeSelection, CgateObjectParams, UnitNode } from '../../shared/types';
 
@@ -276,9 +277,7 @@ export function EntityPanel({
           <h2 className="entityPanel__title">{title}</h2>
           <p className="entityPanel__subtitle">{subtitle}</p>
         </div>
-        <button type="button" className="btn btn--ghost btn--sm btn--icon" onClick={onClose} aria-label="Close">
-          ×
-        </button>
+        <CloseButton onClick={onClose} />
       </header>
 
       {!loading && params && selection.kind === 'unit' && (

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import type { ConnectionStatus } from '../../shared/types';
 import type { CgateServerStatus } from '../../shared/cgateStatus';
+import { CloseButton } from './CloseButton';
 
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
   connected: 'Connected',
@@ -86,21 +87,7 @@ export function CgateStatusPanel({
           >
             {loading ? 'Querying…' : 'Refresh'}
           </button>
-          <button
-            type="button"
-            className="statusPanel__close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path
-                d="M3 3l8 8M11 3L3 11"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
       </header>
 

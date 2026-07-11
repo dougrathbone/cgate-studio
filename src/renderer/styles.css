@@ -680,8 +680,45 @@ input[type="number"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   line-height: 0;
+  border-radius: var(--r-sm);
+}
+
+/* Shared dismiss control — square, centered stroke X */
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 0;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.closeBtn:hover {
+  background: var(--panel-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.closeBtn:active {
+  background: var(--border);
+  color: var(--text);
+}
+.closeBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.closeBtn svg {
+  display: block;
 }
 
 /* ---- Device tree ----------------------------------------------------- */
@@ -942,31 +979,6 @@ input[type="range"].slider::-webkit-slider-thumb:hover {
   align-items: center;
   gap: var(--s2);
   flex-shrink: 0;
-}
-
-.statusPanel__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
-}
-.statusPanel__close:hover {
-  background: var(--panel-2);
-  border-color: var(--text-3);
-  color: var(--text);
-}
-.statusPanel__close:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .statusPanel__grid {
