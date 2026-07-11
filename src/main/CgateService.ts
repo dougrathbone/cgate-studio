@@ -8,16 +8,19 @@ import type {
   GroupRef,
   CommandResult,
   GroupDetail,
+  CgateNetworkInfo,
 } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateObjectParams } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
+import type { CgateProjectInfo } from '../shared/cgateStatus';
 import {
   isServiceReadyLine,
   parseProjectLines,
   parseServerVersion,
   resolveActiveProject,
 } from './cgateStatusParse';
+import { parseNetworkLines } from './cgateSessionParse';
 import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
 import { parseMeasurementEvent } from './measurementParse';
 
@@ -234,7 +237,30 @@ export class CgateService extends EventEmitter {
   // Request the TREEXML for a network, accumulating response lines until the
   // 344 terminator, then parse the 343/347 payload into a Tree. Runs through the
   // command mutex (M5) so it can't interleave with other command-channel ops.
-  getTree(network: string): Promise<Tree> {
+  // Prefers project-qualified `TREEXML //project/net` (C-Gate 3.x); falls back
+  // to bare `TREEXML net` for older servers.
+  async getTree(network: string): Promise<Tree> {
+    const project = await this.getProjectName();
+    if (project) {
+      try {
+        return await this.fetchTreexml(`//${project}/${network}`, network);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Don't fall back after a disconnect / supersession — surface it.
+        if (
+          /disconnected/i.test(msg) ||
+          msg === 'Not connected' ||
+          msg === CONNECTION_SUPERSEDED
+        ) {
+          throw e;
+        }
+        // Older C-Gate or path rejected — try bare network id.
+      }
+    }
+    return this.fetchTreexml(network, network);
+  }
+
+  private fetchTreexml(target: string, networkForParse: string): Promise<Tree> {
     return this.runExclusive(() => new Promise<Tree>((resolve, reject) => {
       const conn = this.command;
       if (!conn) {
@@ -256,10 +282,14 @@ export class CgateService extends EventEmitter {
 
       const consume = (line: string) => {
         lines.push(line);
+        if (/^4\d{2} /.test(line)) {
+          settle(() => reject(new Error(`C-Gate ${line}`)));
+          return;
+        }
         if (!TREE_END.test(line)) return;
         const startIdx = lines.findIndex((l) => TREE_START.test(l));
         const frame = (startIdx === -1 ? lines : lines.slice(startIdx)).join('\n');
-        parseTreeXml(frame, network).then(
+        parseTreeXml(frame, networkForParse).then(
           (tree) => settle(() => resolve(tree as Tree)),
           (err: Error) => settle(() => reject(err)),
         );
@@ -272,7 +302,7 @@ export class CgateService extends EventEmitter {
       timer = setTimeout(() => settle(() => reject(new Error('TREEXML timed out'))), TREE_TIMEOUT_MS);
       this.pendingCommands.add(cancel);
       this.commandConsumer = consume;
-      conn.send(`TREEXML ${network}\r\n`);
+      conn.send(`TREEXML ${target}\r\n`);
     }));
   }
 
@@ -317,9 +347,11 @@ export class CgateService extends EventEmitter {
       };
 
       // Collect response lines until a terminal one ("CODE "); continuation
-      // lines ("CODE-") accumulate first. List commands (PROJECT LIST/DIR) emit
-      // multiple "123 project=..." lines before the final status.
-      const isListItem = (line: string) => /^12[34]\s/i.test(line) && /project=/i.test(line);
+      // lines ("CODE-") accumulate first. List commands (PROJECT LIST/DIR,
+      // NET LIST) emit multiple item lines before the final status.
+      const isListItem = (line: string) =>
+        (/^12[34]\s/i.test(line) && /project=/i.test(line)) ||
+        (/^131\s/i.test(line) && /network=/i.test(line));
       const consume = (line: string) => {
         lines.push(line);
         if (isListItem(line)) return;
@@ -351,6 +383,44 @@ export class CgateService extends EventEmitter {
       this.projectName = '';
     }
     return this.projectName;
+  }
+
+  async listProjectsOnDisk(): Promise<CgateProjectInfo[]> {
+    try {
+      return parseProjectLines((await this.sendCommand('PROJECT DIR')).lines);
+    } catch {
+      return [];
+    }
+  }
+
+  async listLoadedProjects(): Promise<CgateProjectInfo[]> {
+    try {
+      return parseProjectLines((await this.sendCommand('PROJECT LIST')).lines);
+    } catch {
+      return [];
+    }
+  }
+
+  async loadProject(name: string): Promise<CommandResult> {
+    return this.sendCommand(`PROJECT LOAD ${name}`);
+  }
+
+  async startProject(name: string): Promise<CommandResult> {
+    return this.sendCommand(`PROJECT START ${name}`);
+  }
+
+  async useProject(name: string): Promise<CommandResult> {
+    const res = await this.sendCommand(`PROJECT USE ${name}`);
+    this.projectName = name;
+    return res;
+  }
+
+  async listNetworks(): Promise<CgateNetworkInfo[]> {
+    try {
+      return parseNetworkLines((await this.sendCommand('NET LIST')).lines);
+    } catch {
+      return [];
+    }
   }
 
   private async groupPath(ref: GroupRef): Promise<string> {

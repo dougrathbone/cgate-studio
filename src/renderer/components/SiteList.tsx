@@ -15,6 +15,8 @@ export function SiteList({
   activeStatus,
   connectDisabled,
   onConnect,
+  onDisconnect,
+  onEdit,
   onRemove,
 }: {
   sites: Site[];
@@ -22,6 +24,8 @@ export function SiteList({
   activeStatus?: ConnectionStatus;
   connectDisabled?: boolean;
   onConnect: (s: Site) => void;
+  onDisconnect: () => void;
+  onEdit: (s: Site) => void;
   onRemove: (id: string) => void;
 }) {
   if (sites.length === 0) {
@@ -31,6 +35,7 @@ export function SiteList({
     <ul className="siteList">
       {sites.map((s) => {
         const active = s.id === activeId;
+        const connected = active && (activeStatus === 'connected' || activeStatus === 'reconnecting');
         return (
           <li key={s.id} className={active ? 'siteItem siteItem--active' : 'siteItem'}>
             <span className="siteItem__main">
@@ -48,12 +53,26 @@ export function SiteList({
                 {s.host}:{s.commandPort}/{s.eventPort}
               </small>
             </span>
+            {connected ? (
+              <button className="btn btn--sm" onClick={onDisconnect}>
+                Disconnect
+              </button>
+            ) : (
+              <button
+                className="btn btn--sm btn--primary"
+                disabled={connectDisabled}
+                onClick={() => onConnect(s)}
+              >
+                {active && connectDisabled ? 'Connecting…' : active ? 'Reconnect' : 'Connect'}
+              </button>
+            )}
             <button
-              className="btn btn--sm btn--primary"
-              disabled={connectDisabled}
-              onClick={() => onConnect(s)}
+              className="btn btn--sm"
+              onClick={() => onEdit(s)}
+              aria-label={`Edit ${s.name}`}
+              title={`Edit ${s.name}`}
             >
-              {active && connectDisabled ? 'Connecting…' : active ? 'Reconnect' : 'Connect'}
+              Edit
             </button>
             <button
               className="btn btn--danger btn--icon"

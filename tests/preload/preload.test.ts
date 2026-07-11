@@ -78,6 +78,12 @@ describe('preload bridge', () => {
     await api.labels.rename(ref, 'Kitchen');
     await api.project.save();
     await api.project.name();
+    await api.project.dir();
+    await api.project.list();
+    await api.project.load('TESTPROJ');
+    await api.project.start('TESTPROJ');
+    await api.project.use('TESTPROJ');
+    await api.net.list();
     await api.project.import();
     await api.project.export({ tree: [], projectName: 'TEST' });
     await api.nodes.getGroupDetail(ref);
@@ -91,6 +97,12 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('labels:rename', ref, 'Kitchen');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:save');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:name');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:dir');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:list');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:load', 'TESTPROJ');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:start', 'TESTPROJ');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:use', 'TESTPROJ');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('net:list');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:import');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:export', { tree: [], projectName: 'TEST' });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:detail', ref);

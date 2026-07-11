@@ -38,13 +38,22 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
         if (/^EVENT ON/i.test(line) || /^LOGIN/i.test(line) || line.startsWith('#')) {
           socket.write('200 OK.\r\n');
         } else if (/^TREEXML/i.test(line)) {
+          commands.push(line);
           socket.write(fixture.endsWith('\n') ? fixture : fixture + '\n');
         } else if (/^PROJECT LIST/i.test(line)) {
           commands.push(line);
           socket.write('123 project=TESTPROJ state=started\r\n200 OK.\r\n');
         } else if (/^PROJECT DIR/i.test(line)) {
           commands.push(line);
-          socket.write('123 project=TESTPROJ\r\n123 project=ARCHIVE\r\n200 OK.\r\n');
+          socket.write('123-project=TESTPROJ\r\n123 project=ARCHIVE\r\n200 OK.\r\n');
+        } else if (/^PROJECT (LOAD|START|USE|SAVE)\b/i.test(line)) {
+          commands.push(line);
+          socket.write('200 OK.\r\n');
+        } else if (/^NET LIST/i.test(line)) {
+          commands.push(line);
+          socket.write(
+            '131 network=254 State=ok InterfaceState=running SyncState=idle\r\n200 OK.\r\n',
+          );
         } else if (/^DBGET /i.test(line)) {
           commands.push(line);
           const objPath = line.split(/\s+/)[1] ?? '';
@@ -76,7 +85,7 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           const group = objPath.split('/').pop() ?? '';
           const level = group === '4' ? 200 : 0;
           socket.write(`300 ${objPath}: level=${level}\r\n`);
-        } else if (/^(ON|OFF|RAMP|TERMINATERAMP|SET|PROJECT SAVE|TRIGGER) /i.test(line)) {
+        } else if (/^(ON|OFF|RAMP|TERMINATERAMP|SET|TRIGGER) /i.test(line)) {
           commands.push(line);
           socket.write('200 OK.\r\n');
         } else if (line.trim()) {

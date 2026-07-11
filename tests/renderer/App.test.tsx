@@ -87,8 +87,18 @@ function installApi(initialSites: Site[] = [homeSite]) {
     project: {
       save: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
       name: jest.fn().mockResolvedValue('TESTPROJ'),
+      dir: jest.fn().mockResolvedValue([{ name: 'TESTPROJ', state: null }]),
+      list: jest.fn().mockResolvedValue([{ name: 'TESTPROJ', state: 'started' }]),
+      load: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      start: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      use: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
       import: jest.fn().mockResolvedValue(null),
       export: jest.fn().mockResolvedValue(null),
+    },
+    net: {
+      list: jest.fn().mockResolvedValue([
+        { address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle' },
+      ]),
     },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
@@ -448,7 +458,15 @@ describe('App', () => {
       onTrigger: jest.fn(() => offTrigger),
       onMeasurement: jest.fn(() => offMeasurement),
       onTreeChanged: jest.fn(() => offTreeChanged),
-      project: { name: jest.fn().mockResolvedValue('TESTPROJ') },
+      project: {
+        name: jest.fn().mockResolvedValue('TESTPROJ'),
+        dir: jest.fn().mockResolvedValue([]),
+        list: jest.fn().mockResolvedValue([]),
+        load: jest.fn(),
+        start: jest.fn(),
+        use: jest.fn(),
+      },
+      net: { list: jest.fn().mockResolvedValue([]) },
       sites: {
         list: jest.fn().mockResolvedValue([]),
         add: jest.fn(),

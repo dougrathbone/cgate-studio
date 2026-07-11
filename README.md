@@ -46,7 +46,12 @@ its documented interface." CBus Studio is that front-end.
 - Save **multiple C-Gate sites** (one per location) — name + host + command/event
   ports — and switch between them with one click. Sites persist locally (in the
   app's `userData` directory) so installers don't re-type connection details.
-- Connect to an existing C-Gate over TCP (command + event/status ports).
+  Edit a site anytime; optional C-Gate LOGIN credentials and default
+  project/network are stored with the site.
+- Connect to an existing C-Gate over TCP (command + event/status ports). Explicit
+  **Disconnect** tears the session down without auto-reconnect.
+- Pick the active **project** and **network** from the header session bar
+  (`PROJECT DIR`/`LIST`/`LOAD`/`START`/`USE`, `NET LIST`) — no hardcoded network.
 - Render a **collapsible, filterable device tree** — networks → applications →
   groups, plus the **physical units** (dimmers, relays, switches) on each network
   with their type, firmware, and serial — parsed from `TREEXML`.

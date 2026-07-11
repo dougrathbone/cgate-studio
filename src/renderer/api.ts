@@ -15,8 +15,9 @@ import type {
   TriggerActivity,
   TreeChange,
   MeasurementState,
+  CgateNetworkInfo,
 } from '../shared/types';
-import type { CgateServerStatus } from '../shared/cgateStatus';
+import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 
 interface SitesApi {
   list(): Promise<Site[]>;
@@ -40,8 +41,17 @@ interface LabelsApi {
 interface ProjectApi {
   save(): Promise<CommandResult>;
   name(): Promise<string>;
+  dir(): Promise<CgateProjectInfo[]>;
+  list(): Promise<CgateProjectInfo[]>;
+  load(name: string): Promise<CommandResult>;
+  start(name: string): Promise<CommandResult>;
+  use(name: string): Promise<CommandResult>;
   import(): Promise<LabelImport | null>;
   export(input: LabelExportInput): Promise<LabelExportResult | null>;
+}
+
+interface NetApi {
+  list(): Promise<CgateNetworkInfo[]>;
 }
 
 interface NodesApi {
@@ -67,6 +77,7 @@ interface CgateApi {
   control: ControlApi;
   labels: LabelsApi;
   project: ProjectApi;
+  net: NetApi;
   nodes: NodesApi;
 }
 

@@ -32,6 +32,14 @@ jest.mock('../../src/main/CgateService', () => {
     setName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     saveProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     getProjectName = jest.fn().mockResolvedValue('TESTPROJ');
+    listProjectsOnDisk = jest.fn().mockResolvedValue([{ name: 'TESTPROJ', state: null }]);
+    listLoadedProjects = jest.fn().mockResolvedValue([{ name: 'TESTPROJ', state: 'started' }]);
+    loadProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    startProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    useProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    listNetworks = jest.fn().mockResolvedValue([
+      { address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle' },
+    ]);
     getGroupDetail = jest.fn().mockResolvedValue({ label: 'Kitchen', level: 200 });
     getGroupParams = jest.fn().mockResolvedValue({
       Name: 'Kitchen',

@@ -29,6 +29,11 @@ Full design: [`../specs/2026-05-30-cbus-studio-design.md`](../specs/2026-05-30-c
 1. **M1 — Connect & Browse (read-only):** connect, `TREEXML` → tree, live state from event stream.
 2. **M2 — Commission/Test:** switch / ramp / terminate-ramp on a selected group (transient, no DB writes).
 3. **M3 — Organize:** rename network/group/app labels, `PROJECT SAVE` (only DB-writing milestone; gated + confirm).
+4. **M4 — Scenes:** fire trigger-control groups (app 202).
+5. **M5 — Sensors:** measurement app (228) live values + bulk level hydrate.
+6. **M6 — Session & project:** disconnect, site edit/LOGIN, project + network pickers (Approach A). See `docs/superpowers/specs/2026-07-11-cgate-frontend-parity-design.md`.
+
+**Approach A roadmap (approved):** M7 network health → M8 Commission UI → M9 tag DB authoring → M10 diagnostics. Unit programming remains out of scope.
 
 ## Architecture (one-liner)
 

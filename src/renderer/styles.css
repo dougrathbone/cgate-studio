@@ -417,6 +417,31 @@ body {
   text-transform: uppercase;
   color: var(--text-3);
 }
+
+/* ---- Session bar (project / network pickers) ------------------------- */
+
+.sessionBar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s3);
+  margin-right: var(--s2);
+}
+.sessionBar__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.sessionBar__field select {
+  min-width: 9rem;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -425,6 +450,7 @@ body {
   color: var(--text-2);
 }
 .field--row {
+  display: flex;
   flex-direction: row;
   gap: var(--s2);
 }

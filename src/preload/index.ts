@@ -15,8 +15,9 @@ import type {
   TriggerActivity,
   TreeChange,
   MeasurementState,
+  CgateNetworkInfo,
 } from '../shared/types';
-import type { CgateServerStatus } from '../shared/cgateStatus';
+import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 import type { CgateObjectParams } from '../shared/types';
 
 const CH = {
@@ -36,6 +37,12 @@ const CH = {
   rename: 'labels:rename',
   projectSave: 'project:save',
   projectName: 'project:name',
+  projectDir: 'project:dir',
+  projectList: 'project:list',
+  projectLoad: 'project:load',
+  projectStart: 'project:start',
+  projectUse: 'project:use',
+  netList: 'net:list',
   projectImport: 'project:import',
   projectExport: 'project:export',
   nodeDetail: 'nodes:detail',
@@ -106,9 +113,17 @@ contextBridge.exposeInMainWorld('cgate', {
   project: {
     save: (): Promise<CommandResult> => ipcRenderer.invoke(CH.projectSave),
     name: (): Promise<string> => ipcRenderer.invoke(CH.projectName),
+    dir: (): Promise<CgateProjectInfo[]> => ipcRenderer.invoke(CH.projectDir),
+    list: (): Promise<CgateProjectInfo[]> => ipcRenderer.invoke(CH.projectList),
+    load: (name: string): Promise<CommandResult> => ipcRenderer.invoke(CH.projectLoad, name),
+    start: (name: string): Promise<CommandResult> => ipcRenderer.invoke(CH.projectStart, name),
+    use: (name: string): Promise<CommandResult> => ipcRenderer.invoke(CH.projectUse, name),
     import: (): Promise<LabelImport | null> => ipcRenderer.invoke(CH.projectImport),
     export: (input: LabelExportInput): Promise<LabelExportResult | null> =>
       ipcRenderer.invoke(CH.projectExport, input),
+  },
+  net: {
+    list: (): Promise<CgateNetworkInfo[]> => ipcRenderer.invoke(CH.netList),
   },
   nodes: {
     getGroupDetail: (ref: GroupRef): Promise<GroupDetail> =>

@@ -12,16 +12,37 @@ const sites: Site[] = [
   { id: 'b', name: 'Office', host: '10.0.0.2', commandPort: 20023, eventPort: 20025 },
 ];
 
+const noop = {
+  onDisconnect: jest.fn(),
+  onEdit: jest.fn(),
+};
+
 describe('SiteList', () => {
   it('shows a placeholder when there are no sites', () => {
-    render(<SiteList sites={[]} activeId={null} onConnect={jest.fn()} onRemove={jest.fn()} />);
+    render(
+      <SiteList
+        sites={[]}
+        activeId={null}
+        onConnect={jest.fn()}
+        onRemove={jest.fn()}
+        {...noop}
+      />,
+    );
     expect(screen.getByText(/No sites yet/)).toBeInTheDocument();
   });
 
   it('renders each site and fires connect / remove callbacks', () => {
     const onConnect = jest.fn();
     const onRemove = jest.fn();
-    render(<SiteList sites={sites} activeId={null} onConnect={onConnect} onRemove={onRemove} />);
+    render(
+      <SiteList
+        sites={sites}
+        activeId={null}
+        onConnect={onConnect}
+        onRemove={onRemove}
+        {...noop}
+      />,
+    );
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('10.0.0.2:20023/20025')).toBeInTheDocument();
 
@@ -32,18 +53,50 @@ describe('SiteList', () => {
     expect(onRemove).toHaveBeenCalledWith('b');
   });
 
-  it('labels the active site with Reconnect', () => {
-    render(<SiteList sites={sites} activeId="a" onConnect={jest.fn()} onRemove={jest.fn()} />);
+  it('labels the active site with Reconnect when disconnected', () => {
+    render(
+      <SiteList
+        sites={sites}
+        activeId="a"
+        activeStatus="disconnected"
+        onConnect={jest.fn()}
+        onRemove={jest.fn()}
+        {...noop}
+      />,
+    );
     expect(screen.getByText('Reconnect')).toBeInTheDocument();
-    expect(screen.getByText('Connect')).toBeInTheDocument(); // the non-active one
+    expect(screen.getByText('Connect')).toBeInTheDocument();
+  });
+
+  it('shows Disconnect when the active site is connected', () => {
+    const onDisconnect = jest.fn();
+    render(
+      <SiteList
+        sites={sites}
+        activeId="a"
+        activeStatus="connected"
+        onConnect={jest.fn()}
+        onDisconnect={onDisconnect}
+        onEdit={jest.fn()}
+        onRemove={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText('Disconnect'));
+    expect(onDisconnect).toHaveBeenCalled();
   });
 
   it('disables connect while connectDisabled and shows Connecting… on the active site', () => {
     render(
-      <SiteList sites={sites} activeId="a" connectDisabled onConnect={jest.fn()} onRemove={jest.fn()} />,
+      <SiteList
+        sites={sites}
+        activeId="a"
+        connectDisabled
+        onConnect={jest.fn()}
+        onRemove={jest.fn()}
+        {...noop}
+      />,
     );
     expect(screen.getByText('Connecting…')).toBeDisabled();
-    // connectDisabled applies to every site while a connect is in flight.
     expect(screen.getByText('Connect')).toBeDisabled();
   });
 });

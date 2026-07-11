@@ -128,11 +128,19 @@ describe('CgateService', () => {
 
   it('disconnect() while a getTree is in flight rejects the getTree promise instead of hanging', async () => {
     svc = new CgateService();
-    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port });
+    // Pin the project so getTree skips PROJECT LIST and enters fetchTreexml immediately.
+    await svc.connect({
+      host: '127.0.0.1',
+      commandPort: mock.port,
+      eventPort: mock.port,
+      project: 'TESTPROJ',
+    });
     const p = svc.getTree('254');
     // Attach the rejection assertion BEFORE disconnect so there is no window for
-    // an unhandled rejection.
-    const assertion = expect(p).rejects.toThrow('Disconnected during getTree');
+    // an unhandled rejection. getTree is async (project resolve then TREEXML), so
+    // a disconnect that wins the race may surface as "Not connected" instead of
+    // the in-flight cancel message — both mean the tree load did not hang.
+    const assertion = expect(p).rejects.toThrow(/Disconnected during getTree|Not connected/);
     // disconnect() runs synchronously up to settling pending getTree calls, so
     // p rejects before the mock's TREEXML response is processed (I3).
     await svc.disconnect();

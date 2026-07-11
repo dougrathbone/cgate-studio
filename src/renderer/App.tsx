@@ -5,10 +5,23 @@ import { SiteList } from './components/SiteList';
 import { DeviceTree } from './components/DeviceTree';
 import { CgateStatusPanel } from './components/CgateStatusPanel';
 import { EntityPanel } from './components/EntityPanel';
+import { SessionBar } from './components/SessionBar';
 import type { GroupActions } from './components/GroupRow';
-import type { ConnectionStatus, Tree, GroupState, GroupNode, Site, SiteInput, LabelImport, TreeSelection, TriggerActivity, MeasurementState } from '../shared/types';
+import type {
+  ConnectionStatus,
+  Tree,
+  GroupState,
+  GroupNode,
+  Site,
+  SiteInput,
+  LabelImport,
+  TreeSelection,
+  TriggerActivity,
+  MeasurementState,
+  CgateNetworkInfo,
+} from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
-import type { CgateServerStatus } from '../shared/cgateStatus';
+import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 
 const refOf = (g: GroupNode) => ({ network: g.network, application: g.application, group: g.group });
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -77,6 +90,21 @@ function applyImportedLabels(tree: Tree, imp: LabelImport): Tree {
   }));
 }
 
+function mergeProjects(
+  onDisk: CgateProjectInfo[],
+  loaded: CgateProjectInfo[],
+): CgateProjectInfo[] {
+  const byName = new Map<string, CgateProjectInfo>();
+  for (const p of onDisk) byName.set(p.name, { name: p.name, state: p.state ?? null });
+  for (const p of loaded) byName.set(p.name, { name: p.name, state: p.state ?? null });
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function pickNetwork(nets: CgateNetworkInfo[], preferred: string | null): string | null {
+  if (preferred && nets.some((n) => n.address === preferred)) return preferred;
+  return nets[0]?.address ?? null;
+}
+
 export function App() {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [tree, setTree] = useState<Tree>([]);
@@ -88,6 +116,11 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   // The active C-Gate project name, shown next to the network to identify it.
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [projects, setProjects] = useState<CgateProjectInfo[]>([]);
+  const [networks, setNetworks] = useState<CgateNetworkInfo[]>([]);
+  const [activeNetwork, setActiveNetwork] = useState<string | null>(null);
+  const activeNetworkRef = useRef<string | null>(null);
+  activeNetworkRef.current = activeNetwork;
   // Labels imported from a project file, re-applied whenever a tree (re)loads.
   const [imported, setImported] = useState<LabelImport | null>(null);
   // Addresses whose label was renamed but not yet saved to the project DB.
@@ -97,6 +130,7 @@ export function App() {
   const [serverStatus, setServerStatus] = useState<CgateServerStatus | null>(null);
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
+  const [editingSite, setEditingSite] = useState<Site | null>(null);
 
   const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastTrigger, setLastTrigger] = useState<TriggerActivity | null>(null);
@@ -251,7 +285,9 @@ export function App() {
     const offTreeChanged = cgate().onTreeChanged(() => {
       if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
       reconcileTimer.current = setTimeout(() => {
-        cgate().getTree('254').then((t) => {
+        const net = activeNetworkRef.current;
+        if (!net) return;
+        cgate().getTree(net).then((t) => {
           const imp = importedRef.current;
           setTree(imp ? applyImportedLabels(t, imp) : t);
         }).catch(() => {});
@@ -285,9 +321,132 @@ export function App() {
     setSites(await cgate().sites.add(input));
   }
 
+  async function saveSite(site: Site) {
+    setSites(await cgate().sites.update(site));
+    setEditingSite(null);
+  }
+
   async function removeSite(id: string) {
     setSites(await cgate().sites.remove(id));
     if (id === activeSiteId) setActiveSiteId(null);
+    if (editingSite?.id === id) setEditingSite(null);
+  }
+
+  async function disconnectSite() {
+    const gen = ++connectGen.current;
+    ++enrichGen.current;
+    setConnectBusy(false);
+    try {
+      await cgate().disconnect();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+    if (connectGen.current !== gen) return;
+    setTree([]);
+    setStates({});
+    setMeasurements({});
+    setProjectName(null);
+    setProjects([]);
+    setNetworks([]);
+    setActiveNetwork(null);
+    setDirty(new Set());
+    setConfirmSave(false);
+    setSelection(null);
+  }
+
+  /** Activate a project on C-Gate: load (if needed) → start → use. */
+  async function activateProject(name: string): Promise<void> {
+    const loaded = await cgate().project.list();
+    const onDisk = await cgate().project.dir();
+    setProjects(mergeProjects(onDisk, loaded));
+    const already = loaded.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (!already) {
+      try {
+        await cgate().project.load(name);
+      } catch {
+        // May already be loaded under another state — continue to start/use.
+      }
+    }
+    try {
+      await cgate().project.start(name);
+    } catch {
+      // Already started is fine.
+    }
+    await cgate().project.use(name);
+    setProjectName(name);
+    const refreshed = await cgate().project.list();
+    setProjects(mergeProjects(onDisk, refreshed));
+  }
+
+  async function loadTreeForNetwork(
+    network: string,
+    gen: number,
+    enrichGenForTree: number,
+    imp: LabelImport | null,
+  ) {
+    setActiveNetwork(network);
+    const t = await cgate().getTree(network);
+    if (connectGen.current !== gen) return;
+    const display = imp ? applyImportedLabels(t, imp) : t;
+    setTree(display);
+    cgate().nodes.getNetworkLevels(network).then((levels) => {
+      if (connectGen.current !== gen) return;
+      const entries = Object.entries(levels);
+      if (entries.length > 0) {
+        setStates((prev) => {
+          const next = { ...prev };
+          for (const [address, level] of entries) {
+            if (!next[address]) next[address] = { address, level, on: level > 0, ramping: false };
+          }
+          return next;
+        });
+      }
+    }).catch(() => {});
+    if (enrichGen.current === enrichGenForTree) {
+      void enrichTree(collectGroups(display), enrichGenForTree);
+    }
+  }
+
+  async function selectProject(name: string) {
+    setError(null);
+    setConnectBusy(true);
+    const gen = connectGen.current;
+    const enrichGenForTree = ++enrichGen.current;
+    try {
+      await activateProject(name);
+      if (connectGen.current !== gen) return;
+      const nets = await cgate().net.list();
+      if (connectGen.current !== gen) return;
+      setNetworks(nets);
+      const nextNet = pickNetwork(nets, activeNetworkRef.current);
+      if (!nextNet) {
+        setTree([]);
+        setActiveNetwork(null);
+        return;
+      }
+      await loadTreeForNetwork(nextNet, gen, enrichGenForTree, importedRef.current);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      if (connectGen.current === gen) setConnectBusy(false);
+    }
+  }
+
+  async function selectNetwork(address: string) {
+    setError(null);
+    setConnectBusy(true);
+    const gen = connectGen.current;
+    const enrichGenForTree = ++enrichGen.current;
+    setStates({});
+    setMeasurements({});
+    setSelection(null);
+    try {
+      await loadTreeForNetwork(address, gen, enrichGenForTree, importedRef.current);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      if (connectGen.current === gen) setConnectBusy(false);
+    }
   }
 
   async function connectSite(site: Site) {
@@ -300,6 +459,9 @@ export function App() {
     setTree([]);
     setError(null);
     setProjectName(null);
+    setProjects([]);
+    setNetworks([]);
+    setActiveNetwork(null);
     setDirty(new Set());
     setConfirmSave(false);
     setSelection(null);
@@ -311,31 +473,42 @@ export function App() {
         host: site.host,
         commandPort: site.commandPort,
         eventPort: site.eventPort,
+        username: site.username,
+        password: site.password,
+        project: site.defaultProject,
       });
       if (connectGen.current !== gen) return;
-      const t = await cgate().getTree('254');
+
+      const onDisk = await cgate().project.dir();
+      const loaded = await cgate().project.list();
       if (connectGen.current !== gen) return;
-      const display = imp ? applyImportedLabels(t, imp) : t;
-      setTree(display);
-      cgate().nodes.getNetworkLevels('254').then((levels) => {
+      const allProjects = mergeProjects(onDisk, loaded);
+      setProjects(allProjects);
+
+      const chosenProject =
+        (site.defaultProject && allProjects.find((p) => p.name === site.defaultProject)?.name) ||
+        loaded.find((p) => p.state?.toLowerCase() === 'started')?.name ||
+        allProjects[0]?.name ||
+        null;
+
+      if (chosenProject) {
+        await activateProject(chosenProject);
         if (connectGen.current !== gen) return;
-        const entries = Object.entries(levels);
-        if (entries.length > 0) {
-          setStates((prev) => {
-            const next = { ...prev };
-            for (const [address, level] of entries) {
-              if (!next[address]) next[address] = { address, level, on: level > 0, ramping: false };
-            }
-            return next;
-          });
-        }
-      }).catch(() => {});
-      if (enrichGen.current === enrichGenForTree) {
-        void enrichTree(collectGroups(display), enrichGenForTree);
+      } else {
+        const name = await cgate().project.name();
+        if (connectGen.current !== gen) return;
+        if (name) setProjectName(name);
       }
-      cgate().project.name().then((name) => {
-        if (connectGen.current === gen) setProjectName(name);
-      }).catch(() => {});
+
+      const nets = await cgate().net.list();
+      if (connectGen.current !== gen) return;
+      setNetworks(nets);
+      const network = pickNetwork(nets, site.defaultNetwork ?? null);
+      if (!network) {
+        setError('No networks found on this C-Gate project. Open a network in Toolkit/C-Gate first.');
+        return;
+      }
+      await loadTreeForNetwork(network, gen, enrichGenForTree, imp);
     } catch (e) {
       if (connectGen.current !== gen) return;
       const msg = e instanceof Error ? e.message : String(e);
@@ -362,6 +535,17 @@ export function App() {
           )}
         </div>
         <div className="headerRight">
+          {status === 'connected' && (
+            <SessionBar
+              projects={projects}
+              networks={networks}
+              projectName={projectName}
+              activeNetwork={activeNetwork}
+              busy={connectBusy}
+              onSelectProject={selectProject}
+              onSelectNetwork={selectNetwork}
+            />
+          )}
           {notice && <span className="statusNotice" title={notice}>{notice}</span>}
           {error && <span className="statusError" title={error}>⚠ {error}</span>}
           <button type="button" className="btn btn--ghost btn--sm" onClick={importLabels}>
@@ -433,10 +617,21 @@ export function App() {
               activeStatus={status}
               connectDisabled={connectBusy || status === 'connecting'}
               onConnect={connectSite}
+              onDisconnect={() => { void disconnectSite(); }}
+              onEdit={setEditingSite}
               onRemove={removeSite}
             />
           </div>
-          <SiteForm onAdd={addSite} />
+          {editingSite ? (
+            <SiteForm
+              mode="edit"
+              initial={editingSite}
+              onSave={(s) => { void saveSite(s); }}
+              onCancel={() => setEditingSite(null)}
+            />
+          ) : (
+            <SiteForm mode="add" onAdd={addSite} />
+          )}
         </aside>
         <main className={`main${selection ? ' main--split' : ''}`}>
           {lastTrigger && (

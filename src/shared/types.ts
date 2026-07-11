@@ -15,10 +15,32 @@ export interface Site {
   host: string;
   commandPort: number;
   eventPort: number;
+  /** Optional C-Gate LOGIN credentials (sent only over the command channel). */
+  username?: string;
+  password?: string;
+  /** Preferred project to load/use after connect, when present on the server. */
+  defaultProject?: string;
+  /** Preferred network address (e.g. "254") after project is active. */
+  defaultNetwork?: string;
 }
 
 // A new site before the store has assigned it an id.
 export type SiteInput = Omit<Site, 'id'>;
+
+/** A network entry from NET LIST. */
+export interface CgateNetworkInfo {
+  address: string;
+  state?: string | null;
+  interfaceState?: string | null;
+  syncState?: string | null;
+}
+
+/** Active session selection after connect (project + networks). */
+export interface SessionInfo {
+  projectName: string | null;
+  networks: CgateNetworkInfo[];
+  activeNetwork: string | null;
+}
 
 export interface GroupNode {
   kind: 'group';

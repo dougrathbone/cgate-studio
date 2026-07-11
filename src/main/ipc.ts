@@ -23,6 +23,12 @@ export const CHANNELS = {
   rename: 'labels:rename',              // M3: set group Name
   projectSave: 'project:save',          // M3: persist DB
   projectName: 'project:name',
+  projectDir: 'project:dir',            // M6: projects on disk
+  projectList: 'project:list',          // M6: loaded projects
+  projectLoad: 'project:load',
+  projectStart: 'project:start',
+  projectUse: 'project:use',
+  netList: 'net:list',                  // M6: networks in active project
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
@@ -94,6 +100,12 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.rename, (_e, ref: GroupRef, name: string) => svc.setName(ref, name));
   ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
   ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
+  ipcMain.handle(CHANNELS.projectDir, () => svc.listProjectsOnDisk());
+  ipcMain.handle(CHANNELS.projectList, () => svc.listLoadedProjects());
+  ipcMain.handle(CHANNELS.projectLoad, (_e, name: string) => svc.loadProject(name));
+  ipcMain.handle(CHANNELS.projectStart, (_e, name: string) => svc.startProject(name));
+  ipcMain.handle(CHANNELS.projectUse, (_e, name: string) => svc.useProject(name));
+  ipcMain.handle(CHANNELS.netList, () => svc.listNetworks());
   ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
   ipcMain.handle(CHANNELS.networkLevels, (_e, network: string) => svc.getNetworkLevels(network));
   ipcMain.handle(CHANNELS.serverStatus, () => svc.getServerStatus());
