@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { ConnectionStatus } from '../../shared/types';
 import type { CgateServerStatus } from '../../shared/cgateStatus';
 
@@ -40,6 +40,8 @@ export function CgateStatusPanel({
   loading,
   onRefresh,
   onClose,
+  /** Element that owns the trigger + panel; clicks outside this close the panel. */
+  dismissRootRef,
 }: {
   open: boolean;
   connection: ConnectionStatus;
@@ -47,7 +49,26 @@ export function CgateStatusPanel({
   loading: boolean;
   onRefresh: () => void;
   onClose: () => void;
+  dismissRootRef?: React.RefObject<HTMLElement | null>;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const root = dismissRootRef?.current;
+      if (!root) return;
+      if (!root.contains(e.target as Node)) onClose();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, onClose, dismissRootRef]);
+
   if (!open) return null;
 
   const connOk = server?.commandConnected && server?.eventConnected;

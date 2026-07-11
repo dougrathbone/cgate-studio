@@ -51,9 +51,20 @@ const tree: Tree = [
 ];
 
 describe('DeviceTree', () => {
-  it('shows a placeholder when there is no tree', () => {
+  it('shows a disconnected empty state when there is no tree', () => {
     render(<DeviceTree tree={[]} states={{}} />);
     expect(screen.getByText('Not connected.')).toBeInTheDocument();
+  });
+
+  it('shows a connected empty state when the session is up but the tree is empty', () => {
+    render(<DeviceTree tree={[]} states={{}} connected />);
+    expect(screen.getByText('Connected — no tree yet.')).toBeInTheDocument();
+    expect(screen.getByText(/no project is loaded/i)).toBeInTheDocument();
+  });
+
+  it('mentions the active project when connected without a tree', () => {
+    render(<DeviceTree tree={[]} states={{}} connected projectName="HOME" />);
+    expect(screen.getByText(/Project “HOME” is active/i)).toBeInTheDocument();
   });
 
   it('renders the network with units and applications, including live state', () => {

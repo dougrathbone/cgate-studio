@@ -134,6 +134,7 @@ export function App() {
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [confirmSave, setConfirmSave] = useState(false);
   const [statusPanelOpen, setStatusPanelOpen] = useState(false);
+  const statusPanelWrapRef = useRef<HTMLDivElement>(null);
   const [serverStatus, setServerStatus] = useState<CgateServerStatus | null>(null);
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
@@ -552,7 +553,9 @@ export function App() {
       setNetworks(nets);
       const network = pickNetwork(nets, site.defaultNetwork ?? null);
       if (!network) {
-        setError('No networks found on this C-Gate project. Open a network in Toolkit/C-Gate first.');
+        setError(
+          'No networks found for this project. Check the Network menu after the project is started, or open the network in C-Gate/Toolkit.',
+        );
         return;
       }
       await loadTreeForNetwork(network, gen, enrichGenForTree, imp);
@@ -605,7 +608,7 @@ export function App() {
           >
             Export labels
           </button>
-          <div className="statusPanelWrap">
+          <div className="statusPanelWrap" ref={statusPanelWrapRef}>
             <button
               type="button"
               className="statusDotBtn"
@@ -629,6 +632,7 @@ export function App() {
               loading={serverStatusLoading}
               onRefresh={refreshServerStatus}
               onClose={() => setStatusPanelOpen(false)}
+              dismissRootRef={statusPanelWrapRef}
             />
           </div>
         </div>
@@ -732,6 +736,7 @@ export function App() {
               measurements={measurements}
               actions={status === 'connected' ? actions : undefined}
               projectName={projectName}
+              connected={status === 'connected' || status === 'reconnecting'}
               selection={selection}
               onSelect={setSelection}
             />

@@ -79,6 +79,7 @@ export function DeviceTree({
   measurements,
   actions,
   projectName,
+  connected = false,
   selection,
   onSelect,
 }: {
@@ -87,6 +88,8 @@ export function DeviceTree({
   measurements?: Record<string, MeasurementState>;
   actions?: GroupActions;
   projectName?: string | null;
+  /** True when the C-Gate TCP session is up (tree may still be empty). */
+  connected?: boolean;
   selection?: TreeSelection | null;
   onSelect?: (sel: TreeSelection) => void;
 }) {
@@ -111,8 +114,21 @@ export function DeviceTree({
             <path d="M8 20h8M12 18v2" />
           </svg>
         </div>
-        <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>Not connected.</strong>
-        <span>Choose a site and connect to browse the network.</span>
+        {connected ? (
+          <>
+            <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>Connected — no tree yet.</strong>
+            <span>
+              {projectName
+                ? `Project “${projectName}” is active, but no network tree was loaded. Pick a network in the header, or use Open / Sync on the status bar.`
+                : 'C-Gate is reachable, but no project is loaded. Load or start a project in C-Gate (or Toolkit), then choose it from the Project menu.'}
+            </span>
+          </>
+        ) : (
+          <>
+            <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>Not connected.</strong>
+            <span>Choose a site and connect to browse the network.</span>
+          </>
+        )}
       </div>
     );
   }

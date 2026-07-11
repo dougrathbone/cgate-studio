@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import '@testing-library/jest-dom';
-import React from 'react';
+import React, { useRef } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CgateStatusPanel } from '../../src/renderer/components/CgateStatusPanel';
 import type { CgateServerStatus } from '../../src/shared/cgateStatus';
@@ -51,5 +51,42 @@ describe('CgateStatusPanel', () => {
     fireEvent.click(screen.getByLabelText('Close'));
     expect(onRefresh).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('closes on outside pointerdown and Escape, but not when clicking inside the root', () => {
+    const onClose = jest.fn();
+    function Harness({ open }: { open: boolean }) {
+      const rootRef = useRef<HTMLDivElement>(null);
+      return (
+        <div>
+          <div data-testid="outside">outside</div>
+          <div ref={rootRef} data-testid="root">
+            <button type="button">trigger</button>
+            <CgateStatusPanel
+              open={open}
+              connection="connected"
+              server={sample}
+              loading={false}
+              onRefresh={jest.fn()}
+              onClose={onClose}
+              dismissRootRef={rootRef}
+            />
+          </div>
+        </div>
+      );
+    }
+    const { rerender } = render(<Harness open />);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByTestId('root'));
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(screen.getByTestId('outside'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    onClose.mockClear();
+    rerender(<Harness open />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
