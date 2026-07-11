@@ -14,6 +14,7 @@ export function GroupsWorkspace({
   selection,
   onSelect,
   onBulkSetLevel,
+  onClearLabels,
   bulkBusy,
 }: {
   groups: GroupNode[];
@@ -21,6 +22,7 @@ export function GroupsWorkspace({
   selection?: TreeSelection | null;
   onSelect?: (sel: TreeSelection) => void;
   onBulkSetLevel?: (groups: GroupNode[], level: number) => void | Promise<void>;
+  onClearLabels?: (groups: GroupNode[]) => void | Promise<void>;
   bulkBusy?: boolean;
 }) {
   const [filter, setFilter] = useState('');
@@ -90,6 +92,23 @@ export function GroupsWorkspace({
             title="Set selected groups to 50%"
           >
             50%
+          </button>
+          <button
+            type="button"
+            className="btn btn--sm"
+            disabled={bulkBusy || selectedGroups.length === 0 || !onClearLabels}
+            onClick={() => {
+              const n = selectedGroups.length;
+              const ok = window.confirm(
+                n === 1
+                  ? `Clear the project label for ${selectedGroups[0].address}? This marks the TagName as unused until you save.`
+                  : `Clear project labels for ${n} groups? This marks their TagNames as unused until you save.`,
+              );
+              if (ok) void onClearLabels?.(selectedGroups);
+            }}
+            title="Soft-delete TagName (mark as unused)"
+          >
+            Clear label
           </button>
           {selectedGroups.length > 0 && (
             <span className="commTable__selCount">{selectedGroups.length} selected</span>

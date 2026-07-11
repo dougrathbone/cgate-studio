@@ -224,13 +224,34 @@ describe('CgateService', () => {
     expect(detail.level).toBe(0);
   });
 
-  it('renames a group via SET Name and saves the project', async () => {
+  it('renames a group via DBSET TagName (C-Gate 3.x slash form) and saves the project', async () => {
     svc = new CgateService();
     await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
     await svc.setName(ref, 'Kitchen Lights');
     await svc.saveProject();
-    expect(mock.commands).toContain('SET //P/254/56/4 Name "Kitchen Lights"');
+    expect(mock.commands).toContain('DBSET //P/254/56/4/TagName "Kitchen Lights"');
     expect(mock.commands).toContain('PROJECT SAVE P');
+  });
+
+  it('setTagName writes DBSET slash-form TagName', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await svc.setTagName(ref, 'Hall');
+    expect(mock.commands).toContain('DBSET //P/254/56/4/TagName Hall');
+  });
+
+  it('clearTagName soft-deletes via DBSET TagName "<Unused>"', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await svc.clearTagName(ref);
+    expect(mock.commands).toContain('DBSET //P/254/56/4/TagName "<Unused>"');
+  });
+
+  it('setName with blank/whitespace clears the TagName', async () => {
+    svc = new CgateService();
+    await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port, project: 'P' });
+    await svc.setName(ref, '  ');
+    expect(mock.commands).toContain('DBSET //P/254/56/4/TagName "<Unused>"');
   });
 
   it('fetches group parameters via GET *', async () => {

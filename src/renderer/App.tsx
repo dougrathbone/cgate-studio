@@ -601,6 +601,25 @@ export function App() {
     }
   }
 
+  async function clearGroupLabels(groups: GroupNode[]) {
+    if (groups.length === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    try {
+      for (const g of groups) {
+        try {
+          await cgate().labels.clear(refOf(g));
+          setTree((prev) => relabel(prev, g.address, null));
+          setDirty((prev) => new Set(prev).add(g.address));
+        } catch (e) {
+          setError(errMsg(e));
+        }
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const activeSite = sites.find((s) => s.id === activeSiteId) ?? null;
   const flatGroups = collectGroups(tree);
 
@@ -718,7 +737,7 @@ export function App() {
         <div className="banner">
           <span className="banner__dot" aria-hidden />
           <span className="banner__spacer">
-            {dirty.size} unsaved label change{dirty.size === 1 ? '' : 's'}.
+            {dirty.size} unsaved project change{dirty.size === 1 ? '' : 's'}.
             {confirmSave && <strong>&nbsp; Write to the project database on the C-Gate server?</strong>}
           </span>
           {confirmSave ? (
@@ -816,6 +835,7 @@ export function App() {
                     selection={selection}
                     onSelect={setSelection}
                     onBulkSetLevel={status === 'connected' ? bulkSetLevel : undefined}
+                    onClearLabels={status === 'connected' ? clearGroupLabels : undefined}
                     bulkBusy={bulkBusy}
                   />
                 ) : (
@@ -843,6 +863,9 @@ export function App() {
                   ...n,
                   units: n.units.map((u) => u.address === addr ? { ...u, name: name || null } : u),
                 }));
+              }}
+              onProjectDirty={(key) => {
+                setDirty((prev) => new Set(prev).add(key));
               }}
               onError={setError}
               onClose={() => setSelection(null)}

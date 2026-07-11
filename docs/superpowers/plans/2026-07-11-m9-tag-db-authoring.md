@@ -76,41 +76,41 @@
 
 **Files:** `CgateService.ts`, `mockCgate.ts`, `ipc.ts`, `preload`, `api.ts`
 
-- [ ] `setTagName(ref, name)` → `DBSET ${path}/TagName ${formatCgateSetValue(name)}`
-- [ ] `clearTagName(ref)` → `DBSET ${path}/TagName "<Unused>"` (or empty → Unused)
-- [ ] Wire `labels.rename` to prefer `setTagName` (keep `SET Name` optional sync or drop)
-- [ ] Mock accepts `DBSET …/TagName …` and records commands
-- [ ] Unit tests (TDD)
+- [x] `setTagName(ref, name)` → `DBSET ${path}/TagName ${formatCgateSetValue(name)}`
+- [x] `clearTagName(ref)` → `DBSET ${path}/TagName "<Unused>"` (or empty → Unused)
+- [x] Wire `labels.rename` to prefer `setTagName` (keep `SET Name` optional sync or drop)
+- [x] Mock accepts `DBSET …/TagName …` and records commands
+- [x] Unit tests (TDD)
 
 ---
 
 ### Task 3: Dirty alignment
 
-- [ ] EntityPanel `RampTime` / `EventLevel` / `Protected` / Name → mark dirty via callback
-- [ ] Banner copy: “unsaved project change(s)” (not only “label”)
-- [ ] Unit name: mark dirty too if it hits project DB
+- [x] EntityPanel `RampTime` / `EventLevel` / `Protected` / Name → mark dirty via callback
+- [x] Banner copy: “unsaved project change(s)” (not only “label”)
+- [x] Unit name: mark dirty too if it hits project DB
 
 ---
 
 ### Task 4: Commission UI
 
-- [ ] Groups workspace: **Clear label** on selected (confirm dialog) → `clearTagName` + dirty + refresh label
-- [ ] Rename continues via existing tree/inspector paths (now TagName-backed)
-- [ ] Do **not** ship “Add group” until create is possible (show disabled + tooltip, or omit)
+- [x] Groups workspace: **Clear label** on selected (confirm dialog) → `clearTagName` + dirty + refresh label
+- [x] Rename continues via existing tree/inspector paths (now TagName-backed)
+- [x] Do **not** ship “Add group” until create is possible (show disabled + tooltip, or omit)
 
 ---
 
 ### Task 5: Mismatch cue
 
-- [ ] Fetch TagName (from tree label / DBGET) vs `GET Name`; if both non-empty and differ, show subtle hint on Settings
+- [x] Fetch TagName (from tree label / DBGET) vs `GET Name`; if both non-empty and differ, show subtle hint on Settings
 
 ---
 
 ### Task 6: Polish
 
-- [ ] `docs/smoke-checklist-m9.md`
-- [ ] Update AGENTS.md “rename-only” line to reflect soft-delete + TagName writes
-- [ ] Full test suite + commit
+- [x] `docs/smoke-checklist-m9.md`
+- [x] Update AGENTS.md “rename-only” line to reflect soft-delete + TagName writes
+- [x] Full test suite + commit
 
 ---
 

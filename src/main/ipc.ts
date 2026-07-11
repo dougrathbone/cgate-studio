@@ -20,7 +20,8 @@ export const CHANNELS = {
   sitesLabelsSave: 'sites:labels:save',
   setLevel: 'control:setLevel',         // M2: switch / ramp
   terminateRamp: 'control:terminateRamp',
-  rename: 'labels:rename',              // M3: set group Name
+  rename: 'labels:rename',              // M3/M9: DBSET TagName
+  clearTag: 'labels:clear',             // M9: soft-delete TagName → <Unused>
   projectSave: 'project:save',          // M3: persist DB
   projectName: 'project:name',
   projectDir: 'project:dir',            // M6: projects on disk
@@ -105,6 +106,7 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.fireScene, (_e, ref: GroupRef, actionSelector: number) =>
     svc.fireScene(ref, actionSelector));
   ipcMain.handle(CHANNELS.rename, (_e, ref: GroupRef, name: string) => svc.setName(ref, name));
+  ipcMain.handle(CHANNELS.clearTag, (_e, ref: GroupRef) => svc.clearTagName(ref));
   ipcMain.handle(CHANNELS.projectSave, () => svc.saveProject());
   ipcMain.handle(CHANNELS.projectName, () => svc.getProjectName());
   ipcMain.handle(CHANNELS.projectDir, () => svc.listProjectsOnDisk());

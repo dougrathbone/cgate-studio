@@ -22,7 +22,7 @@ Open-source community tool. **Not** a Toolkit clone — no unit programming.
 - **Connect to an existing C-Gate** — do not bundle C-Gate/JRE in the MVP.
 - **No MQTT / Home Assistant** — that is `cgateweb`'s domain.
 - **No unit programming** (Tier 3) — out of scope.
-- **Tag DB editing is rename-only** in v1; the only milestone that writes to the project DB.
+- **Tag DB editing** (M3/M9): rename + soft-delete (`TagName` → `<Unused>`) via `DBSET`; the only paths that write to the project DB, gated behind confirm-on-save.
 - **Security:** renderer never opens sockets. All C-Gate I/O lives in the Electron
   main process behind `CgateService`. Use `contextIsolation: true`, a `preload`
   bridge, and no `nodeIntegration` in the renderer.

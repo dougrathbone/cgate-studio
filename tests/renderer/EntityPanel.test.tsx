@@ -51,6 +51,7 @@ function installApi() {
     },
     labels: {
       rename: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      clear: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
     },
   };
   (window as any).cgate = api;
@@ -109,12 +110,14 @@ describe('EntityPanel', () => {
 
   it('commits a non-Name group parameter via setGroupParam', async () => {
     const api = installApi();
+    const onProjectDirty = jest.fn();
     render(
       <EntityPanel
         selection={{ kind: 'group', group }}
         connected
         onGroupRenamed={jest.fn()}
         onUnitRenamed={jest.fn()}
+        onProjectDirty={onProjectDirty}
         onError={jest.fn()}
         onClose={jest.fn()}
       />,
@@ -130,6 +133,27 @@ describe('EntityPanel', () => {
         '6',
       );
     });
+    expect(onProjectDirty).toHaveBeenCalledWith('254/56/4');
+  });
+
+  it('shows a mismatch hint when TagName differs from object Name', async () => {
+    const api = installApi();
+    api.nodes.getGroupParams.mockResolvedValue({
+      Name: 'Hall Object',
+      RampTime: '4',
+      Type: 'light',
+    });
+    render(
+      <EntityPanel
+        selection={{ kind: 'group', group: { ...group, label: 'Kitchen Tag' } }}
+        connected
+        onGroupRenamed={jest.fn()}
+        onUnitRenamed={jest.fn()}
+        onError={jest.fn()}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(await screen.findByText(/TagName .* differs from object Name/i)).toBeInTheDocument();
   });
 
   it('calls onClose when the close button is clicked', async () => {

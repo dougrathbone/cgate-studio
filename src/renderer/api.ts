@@ -37,6 +37,7 @@ interface ControlApi {
 
 interface LabelsApi {
   rename(ref: GroupRef, name: string): Promise<CommandResult>;
+  clear(ref: GroupRef): Promise<CommandResult>;
 }
 
 interface ProjectApi {

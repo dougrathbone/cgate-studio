@@ -641,10 +641,21 @@ export class CgateService extends EventEmitter {
     return `GET ${networkPath}/* level`;
   }
 
-  // Rename a group's label by setting its `Name` parameter. Quoted when needed.
+  // Rename a group's project-DB label via TagName (C-Gate 3.x slash form).
+  // Blank names soft-delete the tag (`<Unused>`), matching Toolkit / cgateweb.
   async setName(ref: GroupRef, name: string): Promise<CommandResult> {
+    if (!name.trim()) return this.clearTagName(ref);
+    return this.setTagName(ref, name);
+  }
+
+  async setTagName(ref: GroupRef, name: string): Promise<CommandResult> {
     const path = await this.groupPath(ref);
-    return this.sendCommand(`SET ${path} Name ${formatCgateSetValue(name)}`);
+    return this.sendCommand(`DBSET ${path}/TagName ${formatCgateSetValue(name)}`);
+  }
+
+  async clearTagName(ref: GroupRef): Promise<CommandResult> {
+    const path = await this.groupPath(ref);
+    return this.sendCommand(`DBSET ${path}/TagName "<Unused>"`);
   }
 
   async getGroupParams(ref: GroupRef): Promise<CgateObjectParams> {

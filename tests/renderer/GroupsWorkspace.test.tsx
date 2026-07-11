@@ -49,4 +49,17 @@ describe('GroupsWorkspace', () => {
       0,
     );
   });
+
+  it('Clear label confirms then calls onClearLabels with selected groups', () => {
+    const onClearLabels = jest.fn();
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    render(
+      <GroupsWorkspace groups={groups} states={{}} onClearLabels={onClearLabels} />,
+    );
+    fireEvent.click(screen.getByLabelText('Select 254/56/4'));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear label' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(onClearLabels).toHaveBeenCalledWith([groups[0]]);
+    confirmSpy.mockRestore();
+  });
 });

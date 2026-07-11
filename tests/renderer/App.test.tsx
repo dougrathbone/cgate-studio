@@ -84,6 +84,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     },
     labels: {
       rename: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      clear: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
     },
     project: {
       save: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
@@ -235,11 +236,11 @@ describe('App', () => {
       { network: '254', application: '56', group: '4' }, 'Lounge',
     );
     // The unsaved-changes banner appears; saving requires explicit confirmation.
-    expect(await screen.findByText(/1 unsaved label change/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 unsaved project change/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Save to project'));
     await act(async () => { fireEvent.click(screen.getByText('Confirm save')); });
     expect(api.project.save).toHaveBeenCalled();
-    expect(screen.queryByText(/unsaved label change/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/unsaved project change/)).not.toBeInTheDocument();
   });
 
   it('imports project labels and overlays them on the connected tree', async () => {

@@ -114,6 +114,10 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           const group = objPath.split('/').pop() ?? '';
           const level = group === '4' ? 200 : 0;
           socket.write(`300 ${objPath}: level=${level}\r\n`);
+        } else if (/^DBSET\s+\S+\/TagName\b/i.test(line)) {
+          // C-Gate 3.x: `DBSET //proj/net/app/group/TagName "Label"`
+          commands.push(line);
+          socket.write('200 OK.\r\n');
         } else if (/^(ON|OFF|RAMP|TERMINATERAMP|SET|TRIGGER) /i.test(line)) {
           commands.push(line);
           socket.write('200 OK.\r\n');

@@ -30,6 +30,8 @@ jest.mock('../../src/main/CgateService', () => {
     setLevel = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     terminateRamp = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     setName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    setTagName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    clearTagName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     saveProject = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     getProjectName = jest.fn().mockResolvedValue('TESTPROJ');
     listProjectsOnDisk = jest.fn().mockResolvedValue([{ name: 'TESTPROJ', state: null }]);
@@ -165,17 +167,19 @@ describe('registerIpc', () => {
     expect(store.remove).toHaveBeenCalledWith('1');
   });
 
-  it('routes control, rename, and project invocations to the service', async () => {
+  it('routes control, rename, clear-label, and project invocations to the service', async () => {
     const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
     const ref = { network: '254', application: '56', group: '4' };
     await lastHandler(CHANNELS.setLevel)({}, ref, 128, 4);
     await lastHandler(CHANNELS.terminateRamp)({}, ref);
     await lastHandler(CHANNELS.rename)({}, ref, 'Kitchen');
+    await lastHandler(CHANNELS.clearTag)({}, ref);
     await lastHandler(CHANNELS.projectSave)({});
     await lastHandler(CHANNELS.projectName)({});
     expect(svc.setLevel).toHaveBeenCalledWith(ref, 128, 4);
     expect(svc.terminateRamp).toHaveBeenCalledWith(ref);
     expect(svc.setName).toHaveBeenCalledWith(ref, 'Kitchen');
+    expect(svc.clearTagName).toHaveBeenCalledWith(ref);
     expect(svc.saveProject).toHaveBeenCalled();
     expect(svc.getProjectName).toHaveBeenCalled();
   });

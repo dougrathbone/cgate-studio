@@ -145,6 +145,7 @@ export function EntityPanel({
   connected,
   onGroupRenamed,
   onUnitRenamed,
+  onProjectDirty,
   onError,
   onClose,
 }: {
@@ -154,6 +155,7 @@ export function EntityPanel({
   connected: boolean;
   onGroupRenamed: (group: GroupNode, name: string) => void;
   onUnitRenamed: (network: string, unitAddress: string, name: string) => void;
+  onProjectDirty?: (dirtyKey: string) => void;
   onError: (msg: string) => void;
   onClose: () => void;
 }) {
@@ -182,8 +184,9 @@ export function EntityPanel({
         }
         if (!cancelled) {
           setParams(p);
+          // Prefer tree TagName (group.label) for the editable label field.
           setDraft(
-            selection.kind === 'group' && !p.Name && selection.group.label
+            selection.kind === 'group' && selection.group.label
               ? { ...p, Name: selection.group.label }
               : { ...p },
           );
@@ -198,7 +201,13 @@ export function EntityPanel({
   }, [selection]);
 
   async function commitParam(key: string) {
-    if (!connected || draft[key] === params?.[key]) return;
+    if (!connected) return;
+    if (selection.kind === 'group' && key === 'Name') {
+      const currentTag = selection.group.label ?? '';
+      if (draft[key] === currentTag) return;
+    } else if (draft[key] === params?.[key]) {
+      return;
+    }
     try {
       if (selection.kind === 'group') {
         if (key === 'Name') {
@@ -206,15 +215,22 @@ export function EntityPanel({
           onGroupRenamed(selection.group, draft[key]);
         } else {
           await cgate().nodes.setGroupParam(refOf(selection.group), key, draft[key]);
+          onProjectDirty?.(selection.group.address);
         }
       } else if (key === 'Name') {
         await cgate().nodes.setUnitName(selection.network, selection.unit.address, draft[key]);
         onUnitRenamed(selection.network, selection.unit.address, draft[key]);
+        onProjectDirty?.(`${selection.network}/p/${selection.unit.address}`);
       }
       setParams((prev) => ({ ...prev, [key]: draft[key] }));
     } catch (e) {
       onError(errMsg(e));
-      setDraft((d) => ({ ...d, [key]: params?.[key] ?? '' }));
+      setDraft((d) => ({
+        ...d,
+        [key]: selection.kind === 'group' && key === 'Name'
+          ? (selection.group.label ?? params?.[key] ?? '')
+          : (params?.[key] ?? ''),
+      }));
     }
   }
 
@@ -411,7 +427,7 @@ export function EntityPanel({
               {(connected ? [...GROUP_EDITABLE] : []).map((key) => (
                 <ParamRow
                   key={key}
-                  label={key}
+                  label={key === 'Name' ? 'TagName' : key}
                   value={draft[key] ?? ''}
                   editable={connected}
                   onChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
@@ -429,6 +445,16 @@ export function EntityPanel({
                   }
                 />
               ))}
+              {(() => {
+                const tag = (selection.group.label ?? '').trim();
+                const objectName = (params.Name ?? '').trim();
+                if (!tag || !objectName || tag === objectName) return null;
+                return (
+                  <p className="entityPanel__hint" role="status">
+                    TagName (“{tag}”) differs from object Name (“{objectName}”).
+                  </p>
+                );
+              })()}
             </section>
           )}
 

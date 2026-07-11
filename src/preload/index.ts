@@ -36,6 +36,7 @@ const CH = {
   setLevel: 'control:setLevel',
   terminateRamp: 'control:terminateRamp',
   rename: 'labels:rename',
+  clearTag: 'labels:clear',
   projectSave: 'project:save',
   projectName: 'project:name',
   projectDir: 'project:dir',
@@ -121,6 +122,8 @@ contextBridge.exposeInMainWorld('cgate', {
   labels: {
     rename: (ref: GroupRef, name: string): Promise<CommandResult> =>
       ipcRenderer.invoke(CH.rename, ref, name),
+    clear: (ref: GroupRef): Promise<CommandResult> =>
+      ipcRenderer.invoke(CH.clearTag, ref),
   },
   project: {
     save: (): Promise<CommandResult> => ipcRenderer.invoke(CH.projectSave),
