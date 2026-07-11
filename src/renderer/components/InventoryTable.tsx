@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { Tree, UnitNode, TreeSelection } from '../../shared/types';
+import { useFilterHotkeys, useFilterRef } from '../hooks/useFilterHotkeys';
 
 function collectUnits(tree: Tree): { network: string; unit: UnitNode }[] {
   const out: { network: string; unit: UnitNode }[] = [];
@@ -28,6 +29,8 @@ export function InventoryTable({
   onSelect?: (sel: TreeSelection) => void;
 }) {
   const [filter, setFilter] = useState('');
+  const filterRef = useFilterRef();
+  useFilterHotkeys(filterRef, setFilter);
   const q = filter.trim().toLowerCase();
   const rows = useMemo(
     () => collectUnits(tree).filter(({ network, unit }) => matches(unit, network, q)),
@@ -42,6 +45,7 @@ export function InventoryTable({
     <div className="commTable">
       <div className="commTable__toolbar">
         <input
+          ref={filterRef}
           className="filter"
           type="search"
           placeholder={`Filter ${rows.length} units…`}

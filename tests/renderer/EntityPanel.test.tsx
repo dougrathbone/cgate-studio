@@ -30,6 +30,10 @@ const unit: UnitNode = {
 
 function installApi() {
   const api = {
+    labels: {
+      rename: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      clear: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+    },
     nodes: {
       getGroupParams: jest.fn().mockResolvedValue({
         Name: 'Kitchen',
@@ -48,10 +52,7 @@ function installApi() {
       }),
       setGroupParam: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
       setUnitName: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
-    },
-    labels: {
-      rename: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
-      clear: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      identifyUnit: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
     },
   };
   (window as any).cgate = api;
@@ -230,5 +231,24 @@ describe('EntityPanel', () => {
     expect(await screen.findByText('Group addresses')).toBeInTheDocument();
     expect(screen.getByText('121')).toBeInTheDocument();
     expect(screen.getByText('124')).toBeInTheDocument();
+  });
+
+  it('sends Identify for a unit from the Summary tab', async () => {
+    const api = installApi();
+    render(
+      <EntityPanel
+        selection={{ kind: 'unit', network: '254', unit }}
+        connected
+        onGroupRenamed={jest.fn()}
+        onUnitRenamed={jest.fn()}
+        onError={jest.fn()}
+        onClose={jest.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Identify' }));
+    await waitFor(() => {
+      expect(api.nodes.identifyUnit).toHaveBeenCalledWith('254', '61');
+    });
+    expect(await screen.findByText(/Identify sent/i)).toBeInTheDocument();
   });
 });

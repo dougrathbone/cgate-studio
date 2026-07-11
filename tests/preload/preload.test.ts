@@ -93,6 +93,7 @@ describe('preload bridge', () => {
     await api.project.export({ tree: [], projectName: 'TEST' });
     await api.nodes.getGroupDetail(ref);
     await api.nodes.getNetworkLevels('254');
+    await api.nodes.identifyUnit('254', '10');
     await api.nodes.getGroupParams(ref);
     await api.nodes.getUnitParams('254', '10');
     await api.nodes.setGroupParam(ref, 'RampTime', '6');
@@ -116,7 +117,8 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:import');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:export', { tree: [], projectName: 'TEST' });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:detail', ref);
-    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:networkLevels', '254');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:networkLevels', '254', undefined);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:identifyUnit', '254', '10');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:groupParams', ref);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:unitParams', '254', '10');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:setGroupParam', ref, 'RampTime', '6');

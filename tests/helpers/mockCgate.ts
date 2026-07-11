@@ -104,10 +104,21 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
               `300 ${objPath}: Name="${name}" Level=${level} State=on RampTime=4 Protected=no EventLevel=5 Type=light Units=10,14\r\n`,
             );
           }
+        } else if (/^GET\s+\S*\/\d+\/\*\s+level/i.test(line)) {
+          // Per-app bulk: GET //proj/net/app/* level (C-Gate 3.x-safe)
+          commands.push(line);
+          const m = line.match(/\/\/[^/]+\/(\d+)\/(\d+)\/\*/i) || line.match(/\/(\d+)\/(\d+)\/\*/i);
+          const net = m?.[1] ?? '254';
+          const app = m?.[2] ?? '56';
+          socket.write(`300- //TESTPROJ/${net}/${app}/1: level=0\r\n`);
+          socket.write(`300 //TESTPROJ/${net}/${app}/4: level=200\r\n`);
         } else if (/^GET\s+\S*\/\*\s+level/i.test(line)) {
           commands.push(line);
           socket.write('300- //TESTPROJ/254/56/1: level=0\r\n');
           socket.write('300 //TESTPROJ/254/56/4: level=200\r\n');
+        } else if (/^ID\s+/i.test(line)) {
+          commands.push(line);
+          socket.write('200 OK.\r\n');
         } else if (/^GET .*\blevel\b/i.test(line)) {
           commands.push(line);
           const objPath = line.split(/\s+/)[1] ?? '';

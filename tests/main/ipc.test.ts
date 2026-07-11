@@ -49,6 +49,8 @@ jest.mock('../../src/main/CgateService', () => {
       address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle',
     });
     getActivityLog = jest.fn().mockResolvedValue([]);
+    getNetworkLevels = jest.fn().mockResolvedValue({ '254/56/4': 200 });
+    identifyUnit = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     getGroupDetail = jest.fn().mockResolvedValue({ label: 'Kitchen', level: 200 });
     getGroupParams = jest.fn().mockResolvedValue({
       Name: 'Kitchen',
@@ -190,6 +192,12 @@ describe('registerIpc', () => {
     const detail = await lastHandler(CHANNELS.nodeDetail)({}, ref);
     expect(svc.getGroupDetail).toHaveBeenCalledWith(ref);
     expect(detail).toEqual({ label: 'Kitchen', level: 200 });
+  });
+
+  it('routes nodes:identifyUnit to the service', async () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    await lastHandler(CHANNELS.identifyUnit)({}, '254', '10');
+    expect(svc.identifyUnit).toHaveBeenCalledWith('254', '10');
   });
 
   it('routes cgate:serverStatus to the service', async () => {

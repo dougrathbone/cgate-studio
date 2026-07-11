@@ -62,4 +62,12 @@ describe('GroupsWorkspace', () => {
     expect(onClearLabels).toHaveBeenCalledWith([groups[0]]);
     confirmSpy.mockRestore();
   });
+
+  it('focuses the filter when / is pressed', () => {
+    render(<GroupsWorkspace groups={groups} states={{}} />);
+    const input = screen.getByLabelText('Filter groups');
+    expect(input).not.toHaveFocus();
+    fireEvent.keyDown(window, { key: '/' });
+    expect(input).toHaveFocus();
+  });
 });

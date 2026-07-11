@@ -164,10 +164,13 @@ export function EntityPanel({
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [unitTab, setUnitTab] = useState<UnitTab>('summary');
   const [groupTab, setGroupTab] = useState<GroupTab>('settings');
+  const [identifyBusy, setIdentifyBusy] = useState(false);
+  const [identifyMsg, setIdentifyMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setUnitTab('summary');
     setGroupTab(actions ? 'live' : 'settings');
+    setIdentifyMsg(null);
   }, [selection, actions]);
 
   useEffect(() => {
@@ -199,6 +202,20 @@ export function EntityPanel({
     })();
     return () => { cancelled = true; };
   }, [selection]);
+
+  async function identify() {
+    if (!connected || selection.kind !== 'unit') return;
+    setIdentifyBusy(true);
+    setIdentifyMsg(null);
+    try {
+      await cgate().nodes.identifyUnit(selection.network, selection.unit.address);
+      setIdentifyMsg('Identify sent — watch the unit for a blink or indicator.');
+    } catch (e) {
+      setIdentifyMsg(errMsg(e));
+    } finally {
+      setIdentifyBusy(false);
+    }
+  }
 
   async function commitParam(key: string) {
     if (!connected) return;
@@ -335,6 +352,23 @@ export function EntityPanel({
               <p className="entityPanel__hint">
                 Other unit parameters are configured in C-Bus Toolkit. Only the unit name can be changed here.
               </p>
+              {connected && (
+                <div className="entityPanel__sectionBlock">
+                  <h3 className="entityPanel__sectionTitle">Diagnostics</h3>
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    disabled={identifyBusy}
+                    onClick={() => void identify()}
+                    title="Ask the unit to identify itself (usually blinks)"
+                  >
+                    {identifyBusy ? 'Identifying…' : 'Identify'}
+                  </button>
+                  {identifyMsg && (
+                    <p className="entityPanel__hint" role="status">{identifyMsg}</p>
+                  )}
+                </div>
+              )}
             </section>
           )}
 

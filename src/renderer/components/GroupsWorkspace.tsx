@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { GroupNode, GroupState, TreeSelection } from '../../shared/types';
+import { useFilterHotkeys, useFilterRef } from '../hooks/useFilterHotkeys';
 
 function matches(g: GroupNode, q: string): boolean {
   if (!q) return true;
@@ -27,6 +28,8 @@ export function GroupsWorkspace({
 }) {
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const filterRef = useFilterRef();
+  useFilterHotkeys(filterRef, setFilter);
   const q = filter.trim().toLowerCase();
   const rows = useMemo(() => groups.filter((g) => matches(g, q)), [groups, q]);
 
@@ -60,6 +63,7 @@ export function GroupsWorkspace({
     <div className="commTable">
       <div className="commTable__toolbar">
         <input
+          ref={filterRef}
           className="filter"
           type="search"
           placeholder={`Filter ${rows.length} groups…`}

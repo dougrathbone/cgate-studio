@@ -70,10 +70,10 @@
 
 **Files:** `CgateService.ts`, `mockCgate.ts`, `App.tsx`, tests
 
-- [ ] Change `getNetworkLevels(network, applications?: string[])` to issue `GET //proj/net/<app>/* level` for each app (default `['56']` if none given)
-- [ ] App passes application addresses from current tree
-- [ ] Mock accepts per-app form; keep network-wide form for back-compat tests or update tests
-- [ ] Update smoke-checklist-m5 with live finding
+- [x] Change `getNetworkLevels(network, applications?: string[])` to issue `GET //proj/net/<app>/* level` for each app (default `['56']` if none given)
+- [x] App passes application addresses from current tree
+- [x] Mock accepts per-app form; keep network-wide form for back-compat tests or update tests
+- [x] Update smoke-checklist-m5 with live finding
 
 ---
 
@@ -81,10 +81,10 @@
 
 **Files:** `CgateService.ts`, ipc, preload, api, `EntityPanel.tsx`
 
-- [ ] `identifyUnit(network, unitAddress)` → `ID //proj/net/p/unit`
-- [ ] Surface success or friendly `521` message (not a crash)
-- [ ] Unit Summary: **Identify** button + short hint
-- [ ] Tests
+- [x] `identifyUnit(network, unitAddress)` → `ID //proj/net/p/unit`
+- [x] Surface success or friendly `521` message (not a crash)
+- [x] Unit Summary: **Identify** button + short hint
+- [x] Tests
 
 ---
 
@@ -92,10 +92,10 @@
 
 **Files:** `projectExport.ts`, `ipc.ts`, App export UI
 
-- [ ] `buildLabelsCsv(tree)` → `network,application,group,address,label`
-- [ ] Save dialog includes `.csv`
-- [ ] Header Export still one action; extension picks format
-- [ ] Tests
+- [x] `buildLabelsCsv(tree)` → `network,application,group,address,label`
+- [x] Save dialog includes `.csv`
+- [x] Header Export still one action; extension picks format
+- [x] Tests
 
 ---
 
@@ -103,17 +103,17 @@
 
 **Files:** DeviceTree, GroupsWorkspace, InventoryTable (+ thin shared helper if useful)
 
-- [ ] Global `/` (when not in an input) focuses the visible filter
-- [ ] Escape in filter clears and blurs
-- [ ] Tests
+- [x] Global `/` (when not in an input) focuses the visible filter
+- [x] Escape in filter clears and blurs
+- [x] Tests
 
 ---
 
 ### Task 5: Polish
 
-- [ ] `docs/smoke-checklist-m10.md`
-- [ ] Update M4/M5 checklists with confirmed TRIGGER + bulk-per-app
-- [ ] Full suite green + commit
+- [x] `docs/smoke-checklist-m10.md`
+- [x] Update M4/M5 checklists with confirmed TRIGGER + bulk-per-app
+- [x] Full suite green + commit
 
 ---
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState, TreeSelection, MeasurementState } from '../../shared/types';
 import { GroupRow, GroupActions } from './GroupRow';
+import { useFilterHotkeys, useFilterRef } from '../hooks/useFilterHotkeys';
 
 const INDENT = 18;
 
@@ -95,6 +96,8 @@ export function DeviceTree({
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState('');
+  const filterRef = useFilterRef();
+  useFilterHotkeys(filterRef, setFilter);
   const q = filter.trim().toLowerCase();
   const filtering = q.length > 0;
 
@@ -136,6 +139,7 @@ export function DeviceTree({
   return (
     <div className="tree">
       <input
+        ref={filterRef}
         className="filter"
         aria-label="Filter"
         placeholder={`Filter ${totalUnits} devices, applications, groups\u2026`}

@@ -18,6 +18,9 @@
       different, adjust `bulkLevelCommand` only. Confirm initial levels populate
       on connect and that an unsupported form falls back to per-group enrichment
       without error.
+  - **Live note (3.3.2):** Network-wide `GET //proj/net/* level` fails (`402` on apps
+    without level, e.g. 223). **Fixed in M10:** per-app `GET //proj/net/<app>/* level`
+    (e.g. app 56) works with `300-` continuation framing.
   - **Framing note:** Confirm C-Gate frames a multi-object `GET .../* level` reply as `300-` continuation lines
     terminated by a final status line (matching TREEXML framing). If instead it sends multiple terminal `300 `
     lines, `CgateService.sendCommand` will capture only the first — the per-group enrichment fallback still

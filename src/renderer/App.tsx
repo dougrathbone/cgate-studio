@@ -417,7 +417,8 @@ export function App() {
     if (connectGen.current !== gen) return;
     const display = imp ? applyImportedLabels(t, imp) : t;
     setTree(display);
-    cgate().nodes.getNetworkLevels(network).then((levels) => {
+    const apps = [...new Set(display.flatMap((n) => n.applications.map((a) => a.address)))];
+    cgate().nodes.getNetworkLevels(network, apps).then((levels) => {
       if (connectGen.current !== gen) return;
       const entries = Object.entries(levels);
       if (entries.length > 0) {

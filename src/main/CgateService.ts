@@ -562,16 +562,13 @@ export class CgateService extends EventEmitter {
   // (application 202) group. Transient — the trigger application carries no
   // persisted state, so this only requests the action; observed activity comes
   // back on the event stream (see handleEventData -> 'trigger').
-  //
-  // VALIDATE@live-cgate: the exact C-Gate verb/format for firing a trigger is
-  // unverified. Confirm against a live C-Gate and adjust sceneCommand() only.
+  // Confirmed on C-Gate 3.3.2: `TRIGGER EVENT //proj/net/202/g sel` → 200 OK.
   async fireScene(ref: GroupRef, actionSelector: number): Promise<CommandResult> {
     const sel = Math.max(0, Math.min(255, Math.round(actionSelector)));
     return this.sendCommand(this.sceneCommand(await this.groupPath(ref), sel));
   }
 
   private sceneCommand(path: string, actionSelector: number): string {
-    // VALIDATE@live-cgate: confirm this verb against a live C-Gate
     return `TRIGGER EVENT ${path} ${actionSelector}`;
   }
 
@@ -615,30 +612,39 @@ export class CgateService extends EventEmitter {
     return { label, level };
   }
 
-  // Fetch every group level on a network in one bulk query, returning a map of
-  // "net/app/group" -> level. Falls back to {} on error so the caller can use
-  // per-group enrichment instead.
-  //
-  // VALIDATE@live-cgate: the bulk wildcard form is a working assumption; confirm
-  // against a live C-Gate and adjust bulkLevelCommand() only.
-  async getNetworkLevels(network: string): Promise<Record<string, number>> {
+  // Fetch group levels per application. Network-wide `GET //net/* level` fails on
+  // C-Gate 3.x when any app lacks a level parameter (e.g. 223). Per-app form works.
+  async getNetworkLevels(
+    network: string,
+    applications: string[] = ['56'],
+  ): Promise<Record<string, number>> {
     const project = await this.getProjectName();
     const prefix = project ? `//${project}/` : '//';
     const out: Record<string, number> = {};
-    try {
-      const res = await this.sendCommand(this.bulkLevelCommand(`${prefix}${network}`));
-      for (const line of res.lines) {
-        const m = line.match(/\/(\d+)\/(\d+)\/(\d+):\s*level=(\d+)/i);
-        if (m) out[`${m[1]}/${m[2]}/${m[3]}`] = Number(m[4]);
+    const apps = applications.length > 0 ? applications : ['56'];
+    for (const app of apps) {
+      try {
+        const res = await this.sendCommand(this.bulkLevelCommand(`${prefix}${network}`, app));
+        for (const line of res.lines) {
+          const m = line.match(/\/(\d+)\/(\d+)\/(\d+):\s*level=(\d+)/i);
+          if (m) out[`${m[1]}/${m[2]}/${m[3]}`] = Number(m[4]);
+        }
+      } catch {
+        // App missing or level unsupported — skip; caller may enrich per-group.
       }
-    } catch {
-      // Bulk form unsupported on this C-Gate — caller falls back per-group.
     }
     return out;
   }
 
-  private bulkLevelCommand(networkPath: string): string {
-    return `GET ${networkPath}/* level`;
+  private bulkLevelCommand(networkPath: string, application: string): string {
+    return `GET ${networkPath}/${application}/* level`;
+  }
+
+  /** Ask a unit to identify itself (typically blink). Transient — no DB write. */
+  async identifyUnit(network: string, unitAddress: string): Promise<CommandResult> {
+    const project = await this.getProjectName();
+    const prefix = project ? `//${project}/` : '//';
+    return this.sendCommand(`ID ${prefix}${network}/p/${unitAddress}`);
   }
 
   // Rename a group's project-DB label via TagName (C-Gate 3.x slash form).

@@ -40,6 +40,7 @@ export const CHANNELS = {
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
   networkLevels: 'nodes:networkLevels', // bulk level hydration at connect
+  identifyUnit: 'nodes:identifyUnit',   // M10: ID //net/p/unit
   serverStatus: 'cgate:serverStatus',   // query live C-Gate server info
   groupParams: 'nodes:groupParams',
   unitParams: 'nodes:unitParams',
@@ -65,6 +66,7 @@ const saveDialogOptions = {
   filters: [
     { name: 'C-Bus project XML', extensions: ['xml'] },
     { name: 'C-Bus project archive', extensions: ['cbz'] },
+    { name: 'CSV tags', extensions: ['csv'] },
     { name: 'All files', extensions: ['*'] },
   ],
 };
@@ -121,7 +123,10 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.netHealth, (_e, network: string) => svc.refreshNetworkHealth(network));
   ipcMain.handle(CHANNELS.activityLog, () => svc.getActivityLog());
   ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
-  ipcMain.handle(CHANNELS.networkLevels, (_e, network: string) => svc.getNetworkLevels(network));
+  ipcMain.handle(CHANNELS.networkLevels, (_e, network: string, applications?: string[]) =>
+    svc.getNetworkLevels(network, applications));
+  ipcMain.handle(CHANNELS.identifyUnit, (_e, network: string, unit: string) =>
+    svc.identifyUnit(network, unit));
   ipcMain.handle(CHANNELS.serverStatus, () => svc.getServerStatus());
   ipcMain.handle(CHANNELS.groupParams, (_e, ref: GroupRef) => svc.getGroupParams(ref));
   ipcMain.handle(CHANNELS.unitParams, (_e, network: string, unit: string) => svc.getUnitParams(network, unit));

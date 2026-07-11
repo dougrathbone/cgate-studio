@@ -11,6 +11,7 @@ working assumption or records the correction (and the one-line code change).
       fire a scene from the UI. Confirm the exact line C-Gate accepts.
       Working assumption: `TRIGGER EVENT //<project>/<net>/202/<group> <selector>`
       (see `CgateService.sceneCommand`). If different, update `sceneCommand()` only.
+  - **Live note (3.3.2):** `TRIGGER EVENT //5COGAN/254/202/1 0` → `200 OK` — assumption confirmed.
 - [ ] Firing produces the expected physical scene change.
 - [ ] **VALIDATE@live-cgate — trigger event shape.** Confirm the event-stream
       line C-Gate emits for a trigger (device type token + selector position),

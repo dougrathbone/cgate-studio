@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { exportLabelsToFile, exportLabelsFromTree, buildLabelExport } from '../src/main/projectExport';
+import { exportLabelsToFile, exportLabelsFromTree, buildLabelExport, buildLabelsCsv } from '../src/main/projectExport';
 import { importLabelsFromBuffer } from '../src/main/projectImport';
 const AdmZip = require('adm-zip');
 
@@ -55,6 +55,21 @@ describe('projectExport', () => {
     expect(xml).toContain('<TagName>MYPROJ</TagName>');
     expect(xml).toContain('<TagName>Kitchen</TagName>');
     expect(stats).toEqual({ networkCount: 1, groupCount: 1, labelCount: 1, unitCount: 1 });
+  });
+
+  it('buildLabelsCsv returns a header and group rows', () => {
+    const { csv, stats } = buildLabelsCsv(tree);
+    expect(csv).toContain('network,application,group,address,label');
+    expect(csv).toContain('254,56,4,254/56/4,Kitchen');
+    expect(stats).toEqual({ networkCount: 1, groupCount: 1, labelCount: 1, unitCount: 1 });
+  });
+
+  it('exportLabelsToFile writes csv when extension is .csv', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cbus-csv-'));
+    const file = path.join(dir, 'tags.csv');
+    const result = exportLabelsToFile(file, { tree, projectName: 'MYPROJ' });
+    expect(result.path).toBe(file);
+    expect(fs.readFileSync(file, 'utf8')).toContain('Kitchen');
   });
 
   it('exportLabelsFromTree returns xml without writing disk', () => {
