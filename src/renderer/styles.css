@@ -148,6 +148,96 @@ body {
   flex-shrink: 0;
 }
 
+/* ---- Status bar (M7 network health) ---------------------------------- */
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: 6px var(--s4);
+  background: var(--panel-2, var(--panel));
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.statusBar__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.statusBar__label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.statusBar__value {
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--text);
+}
+.statusBar__value--warn {
+  color: var(--warn);
+}
+.statusBar__force {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.statusBar__spacer {
+  flex: 1;
+}
+
+.activityDrawer {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.activityDrawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--border);
+}
+.activityDrawer__body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--s3);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+.activityDrawer__empty {
+  color: var(--text-3);
+  margin: 0;
+}
+.activityLine {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid transparent;
+}
+.activityLine__dir {
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.activityLine--tx .activityLine__dir { color: var(--accent); }
+.activityLine--rx .activityLine__dir { color: var(--on); }
+.activityLine--info .activityLine__dir { color: var(--warn); }
+.activityLine__text {
+  color: var(--text-2);
+  word-break: break-word;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -310,6 +400,19 @@ body {
   overflow: auto;
   padding: var(--s4);
   min-height: 0;
+}
+.main--split,
+.main--activity {
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.main--activity:not(.main--split) .main__tree {
+  flex: 1;
+  overflow: auto;
+  padding: var(--s4);
+  min-width: 0;
 }
 .main--split {
   display: flex;

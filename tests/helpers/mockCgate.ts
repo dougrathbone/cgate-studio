@@ -54,6 +54,26 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
           socket.write(
             '131 network=254 State=ok InterfaceState=running SyncState=idle\r\n200 OK.\r\n',
           );
+        } else if (/^NET OPEN\b/i.test(line)) {
+          commands.push(line);
+          socket.write(
+            '120-initializing\r\n120-opening port\r\n120-open complete\r\n200 OK.\r\n',
+          );
+        } else if (/^NET CLOSE\b/i.test(line)) {
+          commands.push(line);
+          socket.write('200 OK.\r\n');
+        } else if (/^DO\s+\S+\s+SYNC/i.test(line)) {
+          commands.push(line);
+          socket.write('202 Done.\r\n');
+        } else if (/^GET\s+\S+\s+(State|InterfaceState|SyncState)\b/i.test(line)) {
+          commands.push(line);
+          const objPath = line.split(/\s+/)[1] ?? '';
+          const param = line.split(/\s+/)[2] ?? 'State';
+          const val =
+            /^State$/i.test(param) ? 'ok'
+              : /^InterfaceState$/i.test(param) ? 'running'
+                : 'idle';
+          socket.write(`300 ${objPath}: ${param}=${val}\r\n`);
         } else if (/^DBGET /i.test(line)) {
           commands.push(line);
           const objPath = line.split(/\s+/)[1] ?? '';

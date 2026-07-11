@@ -60,8 +60,9 @@ function installApi(initialSites: Site[] = [homeSite]) {
     onStatus: jest.fn((cb: any) => { statusCb = cb; return jest.fn(); }),
     onState: jest.fn((cb: any) => { stateCb = cb; return jest.fn(); }),
     onTrigger: jest.fn(() => jest.fn()),
-    onMeasurement: jest.fn(() => jest.fn()),
+    onMeasurement: jest.fn((cb: any) => { return jest.fn(); }),
     onTreeChanged: jest.fn(() => jest.fn()),
+    onActivity: jest.fn(() => jest.fn()),
     sites: {
       list: jest.fn().mockResolvedValue(initialSites),
       add: jest.fn(),
@@ -99,7 +100,14 @@ function installApi(initialSites: Site[] = [homeSite]) {
       list: jest.fn().mockResolvedValue([
         { address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle' },
       ]),
+      open: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      close: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      sync: jest.fn().mockResolvedValue({ code: 202, text: 'Done.', lines: [] }),
+      health: jest.fn().mockResolvedValue({
+        address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle',
+      }),
     },
+    activity: { list: jest.fn().mockResolvedValue([]) },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
       getNetworkLevels: jest.fn().mockResolvedValue({}),
@@ -448,6 +456,7 @@ describe('App', () => {
     const offTrigger = jest.fn();
     const offMeasurement = jest.fn();
     const offTreeChanged = jest.fn();
+    const offActivity = jest.fn();
     (window as any).cgate = {
       connect: jest.fn(),
       disconnect: jest.fn(),
@@ -458,6 +467,7 @@ describe('App', () => {
       onTrigger: jest.fn(() => offTrigger),
       onMeasurement: jest.fn(() => offMeasurement),
       onTreeChanged: jest.fn(() => offTreeChanged),
+      onActivity: jest.fn(() => offActivity),
       project: {
         name: jest.fn().mockResolvedValue('TESTPROJ'),
         dir: jest.fn().mockResolvedValue([]),
@@ -466,7 +476,11 @@ describe('App', () => {
         start: jest.fn(),
         use: jest.fn(),
       },
-      net: { list: jest.fn().mockResolvedValue([]) },
+      net: {
+        list: jest.fn().mockResolvedValue([]),
+        health: jest.fn().mockResolvedValue({ address: '254' }),
+      },
+      activity: { list: jest.fn().mockResolvedValue([]) },
       sites: {
         list: jest.fn().mockResolvedValue([]),
         add: jest.fn(),
@@ -483,5 +497,6 @@ describe('App', () => {
     expect(offTrigger).toHaveBeenCalled();
     expect(offMeasurement).toHaveBeenCalled();
     expect(offTreeChanged).toHaveBeenCalled();
+    expect(offActivity).toHaveBeenCalled();
   });
 });

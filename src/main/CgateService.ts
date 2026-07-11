@@ -9,8 +9,9 @@ import type {
   CommandResult,
   GroupDetail,
   CgateNetworkInfo,
+  ActivityEntry,
 } from '../shared/types';
-import { CONNECTION_SUPERSEDED } from '../shared/types';
+import { CONNECTION_SUPERSEDED, networkNeedsForce } from '../shared/types';
 import type { CgateObjectParams } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 import type { CgateProjectInfo } from '../shared/cgateStatus';
@@ -20,7 +21,7 @@ import {
   parseServerVersion,
   resolveActiveProject,
 } from './cgateStatusParse';
-import { parseNetworkLines } from './cgateSessionParse';
+import { parseNetworkLines, parseNetworkHealthFromGet } from './cgateSessionParse';
 import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
 import { parseMeasurementEvent } from './measurementParse';
 
@@ -80,6 +81,12 @@ export class CgateService extends EventEmitter {
   private connectOpts: Pick<ConnectOptions, 'host' | 'commandPort' | 'eventPort'> | null = null;
   // Bumped on each connect()/disconnect() so overlapping connects can abort cleanly.
   private connectGeneration = 0;
+  // Last-known health per network address (from NET LIST / GET / after sync).
+  private networkHealth = new Map<string, CgateNetworkInfo>();
+  private activitySeq = 0;
+  private activityLog: ActivityEntry[] = [];
+  private static readonly ACTIVITY_MAX = 200;
+  private static readonly SYNC_TIMEOUT_MS = 120_000;
 
   private setStatus(s: ConnectionStatus) {
     this.status = s;
@@ -111,6 +118,7 @@ export class CgateService extends EventEmitter {
     this.commandBuf = '';
     this.eventBuf = '';
     this.serverGreeting = null;
+    this.networkHealth.clear();
   }
 
   private assertConnectGeneration(gen: number): void {
@@ -311,8 +319,8 @@ export class CgateService extends EventEmitter {
   // Send a single command on the command connection and resolve with its parsed
   // response. Calls are serialized (see commandQueue) so concurrent commands
   // never interleave their replies on the shared stream.
-  sendCommand(cmd: string): Promise<CommandResult> {
-    return this.runExclusive(() => this.sendCommandRaw(cmd));
+  sendCommand(cmd: string, opts?: { timeoutMs?: number }): Promise<CommandResult> {
+    return this.runExclusive(() => this.sendCommandRaw(cmd, opts?.timeoutMs ?? CMD_TIMEOUT_MS));
   }
 
   private runExclusive<T>(fn: () => Promise<T>): Promise<T> {
@@ -329,7 +337,29 @@ export class CgateService extends EventEmitter {
     });
   }
 
-  private sendCommandRaw(cmd: string): Promise<CommandResult> {
+  private noteActivity(direction: ActivityEntry['direction'], text: string) {
+    const entry: ActivityEntry = {
+      id: ++this.activitySeq,
+      at: Date.now(),
+      direction,
+      text,
+    };
+    this.activityLog.push(entry);
+    if (this.activityLog.length > CgateService.ACTIVITY_MAX) {
+      this.activityLog.splice(0, this.activityLog.length - CgateService.ACTIVITY_MAX);
+    }
+    this.emit('activity', entry);
+  }
+
+  getActivityLog(): ActivityEntry[] {
+    return [...this.activityLog];
+  }
+
+  private rememberNetwork(info: CgateNetworkInfo) {
+    this.networkHealth.set(info.address, info);
+  }
+
+  private sendCommandRaw(cmd: string, timeoutMs: number): Promise<CommandResult> {
     const conn = this.command;
     return new Promise<CommandResult>((resolve, reject) => {
       if (!conn) { reject(new Error('Not connected')); return; }
@@ -358,15 +388,21 @@ export class CgateService extends EventEmitter {
         if (!CMD_TERMINAL.test(line)) return;
         const code = parseInt(line.slice(0, 3), 10);
         const text = line.slice(4);
-        if (code >= CMD_ERROR_CODE) settle(() => reject(new Error(`C-Gate ${code}: ${text}`)));
-        else settle(() => resolve({ code, text, lines: [...lines] }));
+        if (code >= CMD_ERROR_CODE) {
+          this.noteActivity('rx', lines.join(' | '));
+          settle(() => reject(new Error(`C-Gate ${code}: ${text}`)));
+        } else {
+          this.noteActivity('rx', lines.join(' | '));
+          settle(() => resolve({ code, text, lines: [...lines] }));
+        }
       };
 
       const cancel = () => settle(() => reject(new Error('Disconnected during command')));
 
-      timer = setTimeout(() => settle(() => reject(new Error(`Command timed out: ${cmd}`))), CMD_TIMEOUT_MS);
+      timer = setTimeout(() => settle(() => reject(new Error(`Command timed out: ${cmd}`))), timeoutMs);
       this.pendingCommands.add(cancel);
       this.commandConsumer = consume;
+      this.noteActivity('tx', cmd);
       conn.send(`${cmd}\r\n`);
     });
   }
@@ -417,10 +453,63 @@ export class CgateService extends EventEmitter {
 
   async listNetworks(): Promise<CgateNetworkInfo[]> {
     try {
-      return parseNetworkLines((await this.sendCommand('NET LIST')).lines);
+      const nets = parseNetworkLines((await this.sendCommand('NET LIST')).lines);
+      for (const n of nets) this.rememberNetwork(n);
+      return nets;
     } catch {
       return [];
     }
+  }
+
+  async openNetwork(network: string): Promise<CommandResult> {
+    const res = await this.sendCommand(`NET OPEN ${network}`, { timeoutMs: CgateService.SYNC_TIMEOUT_MS });
+    this.noteActivity('info', `Network ${network} open`);
+    await this.refreshNetworkHealth(network).catch(() => {});
+    return res;
+  }
+
+  async closeNetwork(network: string): Promise<CommandResult> {
+    const res = await this.sendCommand(`NET CLOSE ${network}`);
+    this.noteActivity('info', `Network ${network} closed`);
+    await this.refreshNetworkHealth(network).catch(() => {});
+    return res;
+  }
+
+  async syncNetwork(network: string): Promise<CommandResult> {
+    this.noteActivity('info', `Syncing network ${network}…`);
+    const res = await this.sendCommand(`DO ${network} SYNC`, { timeoutMs: CgateService.SYNC_TIMEOUT_MS });
+    this.noteActivity('info', `Sync complete for ${network}`);
+    await this.refreshNetworkHealth(network).catch(() => {});
+    return res;
+  }
+
+  async refreshNetworkHealth(network: string): Promise<CgateNetworkInfo> {
+    const project = await this.getProjectName();
+    const path = project ? `//${project}/${network}` : `//${network}`;
+    const merged: CgateNetworkInfo = {
+      address: network,
+      state: null,
+      interfaceState: null,
+      syncState: null,
+      ...(this.networkHealth.get(network) ?? {}),
+    };
+    for (const param of ['State', 'InterfaceState', 'SyncState'] as const) {
+      try {
+        const res = await this.sendCommand(`GET ${path} ${param}`);
+        const parsed = parseNetworkHealthFromGet(network, res.lines);
+        if (param === 'State' && parsed.state) merged.state = parsed.state;
+        if (param === 'InterfaceState' && parsed.interfaceState) merged.interfaceState = parsed.interfaceState;
+        if (param === 'SyncState' && parsed.syncState) merged.syncState = parsed.syncState;
+      } catch {
+        // Parameter may be unsupported — keep prior value.
+      }
+    }
+    this.rememberNetwork(merged);
+    return merged;
+  }
+
+  getCachedNetworkHealth(network: string): CgateNetworkInfo | null {
+    return this.networkHealth.get(network) ?? null;
   }
 
   private async groupPath(ref: GroupRef): Promise<string> {
@@ -429,20 +518,26 @@ export class CgateService extends EventEmitter {
     return `${prefix}${ref.network}/${ref.application}/${ref.group}`;
   }
 
+  private forceSuffix(network: string): string {
+    return networkNeedsForce(this.networkHealth.get(network)) ? ' FORCE' : '';
+  }
+
   // Set a group's level (0-255). 0 => OFF (instant), 255 with no ramp => ON
   // (instant), anything else => RAMP to that level, optionally over rampSecs.
+  // Appends FORCE when the network is in State=new / mid-sync (M7).
   async setLevel(ref: GroupRef, level: number, rampSecs?: number): Promise<CommandResult> {
     const path = await this.groupPath(ref);
     const lv = Math.max(0, Math.min(255, Math.round(level)));
+    const force = this.forceSuffix(ref.network);
     let cmd: string;
-    if (lv <= 0) cmd = `OFF ${path}`;
-    else if (lv >= 255 && rampSecs == null) cmd = `ON ${path}`;
-    else cmd = `RAMP ${path} ${lv}${rampSecs != null ? ` ${rampSecs}s` : ''}`;
+    if (lv <= 0) cmd = `OFF ${path}${force}`;
+    else if (lv >= 255 && rampSecs == null) cmd = `ON ${path}${force}`;
+    else cmd = `RAMP ${path} ${lv}${rampSecs != null ? ` ${rampSecs}s` : ''}${force}`;
     return this.sendCommand(cmd);
   }
 
   async terminateRamp(ref: GroupRef): Promise<CommandResult> {
-    return this.sendCommand(`TERMINATERAMP ${await this.groupPath(ref)}`);
+    return this.sendCommand(`TERMINATERAMP ${await this.groupPath(ref)}${this.forceSuffix(ref.network)}`);
   }
 
   // Fire a C-Bus scene by sending an action selector to a Trigger Control

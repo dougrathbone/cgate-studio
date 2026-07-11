@@ -6,6 +6,8 @@ import { DeviceTree } from './components/DeviceTree';
 import { CgateStatusPanel } from './components/CgateStatusPanel';
 import { EntityPanel } from './components/EntityPanel';
 import { SessionBar } from './components/SessionBar';
+import { StatusBar } from './components/StatusBar';
+import { ActivityDrawer } from './components/ActivityDrawer';
 import type { GroupActions } from './components/GroupRow';
 import type {
   ConnectionStatus,
@@ -19,6 +21,7 @@ import type {
   TriggerActivity,
   MeasurementState,
   CgateNetworkInfo,
+  ActivityEntry,
 } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
@@ -121,6 +124,10 @@ export function App() {
   const [activeNetwork, setActiveNetwork] = useState<string | null>(null);
   const activeNetworkRef = useRef<string | null>(null);
   activeNetworkRef.current = activeNetwork;
+  const [networkHealth, setNetworkHealth] = useState<CgateNetworkInfo | null>(null);
+  const [netBusy, setNetBusy] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   // Labels imported from a project file, re-applied whenever a tree (re)loads.
   const [imported, setImported] = useState<LabelImport | null>(null);
   // Addresses whose label was renamed but not yet saved to the project DB.
@@ -282,6 +289,8 @@ export function App() {
     const offTrigger = cgate().onTrigger((t) => setLastTrigger(t));
     const offMeasurement = cgate().onMeasurement((m) =>
       setMeasurements((prev) => ({ ...prev, [m.address]: m })));
+    const offActivity = cgate().onActivity((a) =>
+      setActivity((prev) => [...prev.slice(-199), a]));
     const offTreeChanged = cgate().onTreeChanged(() => {
       if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
       reconcileTimer.current = setTimeout(() => {
@@ -298,6 +307,7 @@ export function App() {
       offState();
       offTrigger();
       offMeasurement();
+      offActivity();
       offTreeChanged();
       if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
     };
@@ -349,6 +359,8 @@ export function App() {
     setProjects([]);
     setNetworks([]);
     setActiveNetwork(null);
+    setNetworkHealth(null);
+    setActivity([]);
     setDirty(new Set());
     setConfirmSave(false);
     setSelection(null);
@@ -385,6 +397,14 @@ export function App() {
     imp: LabelImport | null,
   ) {
     setActiveNetwork(network);
+    try {
+      const health = await cgate().net.health(network);
+      if (connectGen.current === gen) setNetworkHealth(health);
+    } catch {
+      if (connectGen.current === gen) {
+        setNetworkHealth({ address: network, state: null, interfaceState: null, syncState: null });
+      }
+    }
     const t = await cgate().getTree(network);
     if (connectGen.current !== gen) return;
     const display = imp ? applyImportedLabels(t, imp) : t;
@@ -404,6 +424,31 @@ export function App() {
     }).catch(() => {});
     if (enrichGen.current === enrichGenForTree) {
       void enrichTree(collectGroups(display), enrichGenForTree);
+    }
+  }
+
+  async function runNetOp(op: 'open' | 'close' | 'sync' | 'health') {
+    const net = activeNetworkRef.current;
+    if (!net) return;
+    setError(null);
+    setNetBusy(true);
+    try {
+      if (op === 'open') await cgate().net.open(net);
+      else if (op === 'close') await cgate().net.close(net);
+      else if (op === 'sync') await cgate().net.sync(net);
+      const health = await cgate().net.health(net);
+      setNetworkHealth(health);
+      const nets = await cgate().net.list();
+      setNetworks(nets);
+      if (op === 'sync' || op === 'open') {
+        const gen = connectGen.current;
+        const enrichGenForTree = ++enrichGen.current;
+        await loadTreeForNetwork(net, gen, enrichGenForTree, importedRef.current);
+      }
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setNetBusy(false);
     }
   }
 
@@ -462,6 +507,8 @@ export function App() {
     setProjects([]);
     setNetworks([]);
     setActiveNetwork(null);
+    setNetworkHealth(null);
+    setActivity([]);
     setDirty(new Set());
     setConfirmSave(false);
     setSelection(null);
@@ -589,6 +636,22 @@ export function App() {
         </div>
       </header>
 
+      {status === 'connected' && (
+        <StatusBar
+          connection={status}
+          projectName={projectName}
+          network={activeNetwork}
+          health={networkHealth}
+          netBusy={netBusy || connectBusy}
+          onOpen={() => { void runNetOp('open'); }}
+          onClose={() => { void runNetOp('close'); }}
+          onSync={() => { void runNetOp('sync'); }}
+          onRefreshHealth={() => { void runNetOp('health'); }}
+          onToggleActivity={() => setActivityOpen((v) => !v)}
+          activityOpen={activityOpen}
+        />
+      )}
+
       {dirty.size > 0 && (
         <div className="banner">
           <span className="banner__dot" aria-hidden />
@@ -633,7 +696,7 @@ export function App() {
             <SiteForm mode="add" onAdd={addSite} />
           )}
         </aside>
-        <main className={`main${selection ? ' main--split' : ''}`}>
+        <main className={`main${selection ? ' main--split' : ''}${activityOpen ? ' main--activity' : ''}`}>
           {lastTrigger && (
             <div className="lastTrigger" title={lastTrigger.address}>
               Fired {lastTrigger.address} → {lastTrigger.actionSelector}
@@ -670,6 +733,11 @@ export function App() {
               onClose={() => setSelection(null)}
             />
           )}
+          <ActivityDrawer
+            open={activityOpen}
+            entries={activity}
+            onClose={() => setActivityOpen(false)}
+          />
         </main>
       </div>
     </div>

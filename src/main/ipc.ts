@@ -4,7 +4,7 @@ import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
 import { exportLabelsToFile } from './projectExport';
-import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange, MeasurementState } from '../shared/types';
+import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange, MeasurementState, ActivityEntry } from '../shared/types';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -29,6 +29,12 @@ export const CHANNELS = {
   projectStart: 'project:start',
   projectUse: 'project:use',
   netList: 'net:list',                  // M6: networks in active project
+  netOpen: 'net:open',                  // M7
+  netClose: 'net:close',
+  netSync: 'net:sync',
+  netHealth: 'net:health',
+  activityLog: 'activity:list',
+  activity: 'cgate:activity',           // main -> renderer push
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
@@ -74,6 +80,7 @@ export function registerIpc(
   svc.on('trigger', (t: TriggerActivity) => getWindow()?.webContents.send(CHANNELS.trigger, t));
   svc.on('treeChanged', (c: TreeChange) => getWindow()?.webContents.send(CHANNELS.treeChanged, c));
   svc.on('measurement', (m: MeasurementState) => getWindow()?.webContents.send(CHANNELS.measurement, m));
+  svc.on('activity', (a: ActivityEntry) => getWindow()?.webContents.send(CHANNELS.activity, a));
 
   ipcMain.handle(CHANNELS.connect, (_e, opts: ConnectOptions) => svc.connect(opts));
   ipcMain.handle(CHANNELS.disconnect, () => svc.disconnect());
@@ -106,6 +113,11 @@ export function registerIpc(
   ipcMain.handle(CHANNELS.projectStart, (_e, name: string) => svc.startProject(name));
   ipcMain.handle(CHANNELS.projectUse, (_e, name: string) => svc.useProject(name));
   ipcMain.handle(CHANNELS.netList, () => svc.listNetworks());
+  ipcMain.handle(CHANNELS.netOpen, (_e, network: string) => svc.openNetwork(network));
+  ipcMain.handle(CHANNELS.netClose, (_e, network: string) => svc.closeNetwork(network));
+  ipcMain.handle(CHANNELS.netSync, (_e, network: string) => svc.syncNetwork(network));
+  ipcMain.handle(CHANNELS.netHealth, (_e, network: string) => svc.refreshNetworkHealth(network));
+  ipcMain.handle(CHANNELS.activityLog, () => svc.getActivityLog());
   ipcMain.handle(CHANNELS.nodeDetail, (_e, ref: GroupRef) => svc.getGroupDetail(ref));
   ipcMain.handle(CHANNELS.networkLevels, (_e, network: string) => svc.getNetworkLevels(network));
   ipcMain.handle(CHANNELS.serverStatus, () => svc.getServerStatus());

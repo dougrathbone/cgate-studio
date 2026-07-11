@@ -16,6 +16,7 @@ import type {
   TreeChange,
   MeasurementState,
   CgateNetworkInfo,
+  ActivityEntry,
 } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 
@@ -52,6 +53,14 @@ interface ProjectApi {
 
 interface NetApi {
   list(): Promise<CgateNetworkInfo[]>;
+  open(network: string): Promise<CommandResult>;
+  close(network: string): Promise<CommandResult>;
+  sync(network: string): Promise<CommandResult>;
+  health(network: string): Promise<CgateNetworkInfo>;
+}
+
+interface ActivityApi {
+  list(): Promise<ActivityEntry[]>;
 }
 
 interface NodesApi {
@@ -73,11 +82,13 @@ interface CgateApi {
   onTrigger(cb: (t: TriggerActivity) => void): () => void;
   onTreeChanged(cb: (c: TreeChange) => void): () => void;
   onMeasurement(cb: (m: MeasurementState) => void): () => void;
+  onActivity(cb: (a: ActivityEntry) => void): () => void;
   sites: SitesApi;
   control: ControlApi;
   labels: LabelsApi;
   project: ProjectApi;
   net: NetApi;
+  activity: ActivityApi;
   nodes: NodesApi;
 }
 

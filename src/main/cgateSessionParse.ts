@@ -18,3 +18,20 @@ export function parseNetworkLines(lines: string[]): CgateNetworkInfo[] {
   }
   return out;
 }
+
+/** Pull State / InterfaceState / SyncState from GET response lines for one network. */
+export function parseNetworkHealthFromGet(
+  address: string,
+  lines: string[],
+): CgateNetworkInfo {
+  const blob = lines.join('\n');
+  const stateM = blob.match(/(?:^|\s)State=(\S+)/i);
+  const ifaceM = blob.match(/InterfaceState=(\S+)/i);
+  const syncM = blob.match(/SyncState=(\S+)/i);
+  return {
+    address,
+    state: stateM?.[1] ?? null,
+    interfaceState: ifaceM?.[1] ?? null,
+    syncState: syncM?.[1] ?? null,
+  };
+}

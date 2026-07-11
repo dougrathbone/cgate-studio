@@ -46,7 +46,15 @@ function installFakeCgate() {
     },
     net: {
       list: jest.fn().mockResolvedValue([{ address: '254', state: 'ok' }]),
+      open: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      close: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      sync: jest.fn().mockResolvedValue({ code: 202, text: 'Done.', lines: [] }),
+      health: jest.fn().mockResolvedValue({
+        address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle',
+      }),
     },
+    activity: { list: jest.fn().mockResolvedValue([]) },
+    onActivity: () => () => {},
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
       getNetworkLevels: jest.fn().mockResolvedValue({}),

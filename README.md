@@ -52,6 +52,10 @@ its documented interface." CBus Studio is that front-end.
   **Disconnect** tears the session down without auto-reconnect.
 - Pick the active **project** and **network** from the header session bar
   (`PROJECT DIR`/`LIST`/`LOAD`/`START`/`USE`, `NET LIST`) — no hardcoded network.
+- **Network health** status bar: State / InterfaceState / SyncState, plus Open /
+  Close / Sync. Lighting commands append `FORCE` automatically when the network
+  is unsynced (`State=new`). Optional **Activity** drawer shows recent C-Gate
+  command traffic.
 - Render a **collapsible, filterable device tree** — networks → applications →
   groups, plus the **physical units** (dimmers, relays, switches) on each network
   with their type, firmware, and serial — parsed from `TREEXML`.

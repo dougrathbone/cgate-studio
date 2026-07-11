@@ -42,6 +42,24 @@ export interface SessionInfo {
   activeNetwork: string | null;
 }
 
+/** A command/response line captured for the activity drawer (M7). */
+export interface ActivityEntry {
+  id: number;
+  at: number; // Date.now()
+  direction: 'tx' | 'rx' | 'info';
+  text: string;
+}
+
+/** True when lighting commands should append FORCE (unsynced / new network). */
+export function networkNeedsForce(info: Pick<CgateNetworkInfo, 'state' | 'syncState'> | null | undefined): boolean {
+  if (!info) return false;
+  const state = (info.state ?? '').toLowerCase();
+  const sync = (info.syncState ?? '').toLowerCase();
+  if (state === 'new') return true;
+  if (sync && sync !== 'idle' && sync !== 'ok' && sync !== 'synced') return true;
+  return false;
+}
+
 export interface GroupNode {
   kind: 'group';
   address: string;        // "254/56/4"

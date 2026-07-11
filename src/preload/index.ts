@@ -16,6 +16,7 @@ import type {
   TreeChange,
   MeasurementState,
   CgateNetworkInfo,
+  ActivityEntry,
 } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 import type { CgateObjectParams } from '../shared/types';
@@ -43,6 +44,12 @@ const CH = {
   projectStart: 'project:start',
   projectUse: 'project:use',
   netList: 'net:list',
+  netOpen: 'net:open',
+  netClose: 'net:close',
+  netSync: 'net:sync',
+  netHealth: 'net:health',
+  activityLog: 'activity:list',
+  activity: 'cgate:activity',
   projectImport: 'project:import',
   projectExport: 'project:export',
   nodeDetail: 'nodes:detail',
@@ -88,6 +95,11 @@ contextBridge.exposeInMainWorld('cgate', {
     ipcRenderer.on(CH.measurement, h);
     return () => ipcRenderer.removeListener(CH.measurement, h);
   },
+  onActivity: (cb: (a: ActivityEntry) => void) => {
+    const h = (_e: unknown, a: ActivityEntry) => cb(a);
+    ipcRenderer.on(CH.activity, h);
+    return () => ipcRenderer.removeListener(CH.activity, h);
+  },
   sites: {
     list: (): Promise<Site[]> => ipcRenderer.invoke(CH.sitesList),
     add: (input: SiteInput): Promise<Site[]> => ipcRenderer.invoke(CH.sitesAdd, input),
@@ -124,6 +136,13 @@ contextBridge.exposeInMainWorld('cgate', {
   },
   net: {
     list: (): Promise<CgateNetworkInfo[]> => ipcRenderer.invoke(CH.netList),
+    open: (network: string): Promise<CommandResult> => ipcRenderer.invoke(CH.netOpen, network),
+    close: (network: string): Promise<CommandResult> => ipcRenderer.invoke(CH.netClose, network),
+    sync: (network: string): Promise<CommandResult> => ipcRenderer.invoke(CH.netSync, network),
+    health: (network: string): Promise<CgateNetworkInfo> => ipcRenderer.invoke(CH.netHealth, network),
+  },
+  activity: {
+    list: (): Promise<ActivityEntry[]> => ipcRenderer.invoke(CH.activityLog),
   },
   nodes: {
     getGroupDetail: (ref: GroupRef): Promise<GroupDetail> =>

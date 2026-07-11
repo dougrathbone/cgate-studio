@@ -40,6 +40,13 @@ jest.mock('../../src/main/CgateService', () => {
     listNetworks = jest.fn().mockResolvedValue([
       { address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle' },
     ]);
+    openNetwork = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    closeNetwork = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    syncNetwork = jest.fn().mockResolvedValue({ code: 202, text: 'Done.', lines: [] });
+    refreshNetworkHealth = jest.fn().mockResolvedValue({
+      address: '254', state: 'ok', interfaceState: 'running', syncState: 'idle',
+    });
+    getActivityLog = jest.fn().mockResolvedValue([]);
     getGroupDetail = jest.fn().mockResolvedValue({ label: 'Kitchen', level: 200 });
     getGroupParams = jest.fn().mockResolvedValue({
       Name: 'Kitchen',

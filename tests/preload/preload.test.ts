@@ -84,6 +84,11 @@ describe('preload bridge', () => {
     await api.project.start('TESTPROJ');
     await api.project.use('TESTPROJ');
     await api.net.list();
+    await api.net.open('254');
+    await api.net.close('254');
+    await api.net.sync('254');
+    await api.net.health('254');
+    await api.activity.list();
     await api.project.import();
     await api.project.export({ tree: [], projectName: 'TEST' });
     await api.nodes.getGroupDetail(ref);
@@ -103,6 +108,11 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:start', 'TESTPROJ');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:use', 'TESTPROJ');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('net:list');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('net:open', '254');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('net:close', '254');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('net:sync', '254');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('net:health', '254');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('activity:list');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:import');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:export', { tree: [], projectName: 'TEST' });
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:detail', ref);
