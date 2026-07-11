@@ -581,20 +581,18 @@ export function App() {
             </span>
           )}
         </div>
+        {status === 'connected' && (
+          <SessionBar
+            projects={projects}
+            networks={networks}
+            projectName={projectName}
+            activeNetwork={activeNetwork}
+            busy={connectBusy}
+            onSelectProject={selectProject}
+            onSelectNetwork={selectNetwork}
+          />
+        )}
         <div className="headerRight">
-          {status === 'connected' && (
-            <SessionBar
-              projects={projects}
-              networks={networks}
-              projectName={projectName}
-              activeNetwork={activeNetwork}
-              busy={connectBusy}
-              onSelectProject={selectProject}
-              onSelectNetwork={selectNetwork}
-            />
-          )}
-          {notice && <span className="statusNotice" title={notice}>{notice}</span>}
-          {error && <span className="statusError" title={error}>⚠ {error}</span>}
           <button type="button" className="btn btn--ghost btn--sm" onClick={importLabels}>
             Import labels
           </button>
@@ -635,6 +633,31 @@ export function App() {
           </div>
         </div>
       </header>
+
+      {error && (
+        <div className="flashBanner flashBanner--error" role="alert">
+          <span className="flashBanner__text" title={error}>{error}</span>
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost flashBanner__dismiss"
+            onClick={() => setError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {!error && notice && (
+        <div className="flashBanner flashBanner--notice" role="status">
+          <span className="flashBanner__text" title={notice}>{notice}</span>
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost flashBanner__dismiss"
+            onClick={() => setNotice(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {status === 'connected' && (
         <StatusBar

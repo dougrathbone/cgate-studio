@@ -139,10 +139,10 @@ body {
 .app__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--s4);
-  padding: 0 var(--s4);
-  height: 52px;
+  gap: var(--s5);
+  padding: var(--s2) var(--s4);
+  min-height: 52px;
+  height: auto;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -243,6 +243,7 @@ body {
   align-items: center;
   gap: var(--s3);
   min-width: 0;
+  flex-shrink: 0;
 }
 .brand__mark {
   width: 24px;
@@ -282,6 +283,36 @@ body {
   display: flex;
   align-items: center;
   gap: var(--s3);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ---- Session bar (project / network pickers) ------------------------- */
+
+.sessionBar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s4);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: var(--s2);
+}
+.sessionBar__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  min-width: 0;
+}
+.sessionBar__field select {
+  width: 10.5rem;
+  max-width: 100%;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .statusPill {
@@ -311,32 +342,36 @@ body {
   cursor: help;
   box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 16%, transparent);
 }
-.statusError {
-  display: inline-flex;
+
+/* Transient notices live under the header so they don't fight the action cluster. */
+.flashBanner {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 360px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  gap: var(--s3);
+  padding: 6px var(--s4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.flashBanner--error {
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: 12px;
+  border-bottom-color: color-mix(in srgb, var(--danger) 28%, transparent);
+}
+.flashBanner--notice {
+  background: color-mix(in srgb, var(--on) 12%, transparent);
+  color: var(--on);
+  border-bottom-color: color-mix(in srgb, var(--on) 28%, transparent);
+}
+.flashBanner__text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.statusNotice {
-  display: inline-flex;
-  align-items: center;
-  max-width: 360px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--on) 14%, transparent);
-  color: var(--on);
-  font-size: 12px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.flashBanner__dismiss {
+  flex-shrink: 0;
 }
 
 /* ---- Banner (unsaved changes) ---------------------------------------- */
@@ -379,6 +414,8 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
 }
 .sidebar__title {
   margin: 0;
@@ -469,12 +506,14 @@ body {
 .siteItem {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--s2);
   padding: var(--s3);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--panel-2);
   transition: border-color 0.12s, background 0.12s;
+  min-width: 0;
 }
 .siteItem:hover {
   border-color: var(--border-strong);
@@ -513,6 +552,8 @@ body {
   flex-direction: column;
   gap: var(--s3);
   flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 .siteForm__title {
   font-size: 11px;
@@ -521,44 +562,24 @@ body {
   color: var(--text-3);
 }
 
-/* ---- Session bar (project / network pickers) ------------------------- */
-
-.sessionBar {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--s3);
-  margin-right: var(--s2);
-}
-.sessionBar__field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-.sessionBar__field select {
-  min-width: 9rem;
-  font-size: 12px;
-  text-transform: none;
-  letter-spacing: normal;
-}
-
 .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
   color: var(--text-2);
+  min-width: 0;
 }
 .field--row {
   display: flex;
   flex-direction: row;
   gap: var(--s2);
+  min-width: 0;
+  width: 100%;
 }
 .field--row > .field {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* ---- Inputs ---------------------------------------------------------- */
@@ -573,6 +594,15 @@ select {
   border-radius: var(--r-sm);
   padding: 7px 9px;
   transition: border-color 0.12s, box-shadow 0.12s;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.siteForm input,
+.siteForm select,
+.field > input,
+.field > select {
+  width: 100%;
+  max-width: 100%;
 }
 input::placeholder {
   color: var(--text-3);
