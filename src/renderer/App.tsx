@@ -8,6 +8,9 @@ import { EntityPanel } from './components/EntityPanel';
 import { SessionBar } from './components/SessionBar';
 import { StatusBar } from './components/StatusBar';
 import { ActivityDrawer } from './components/ActivityDrawer';
+import { ModeToggle } from './components/ModeToggle';
+import { InventoryTable } from './components/InventoryTable';
+import { GroupsWorkspace } from './components/GroupsWorkspace';
 import type { GroupActions } from './components/GroupRow';
 import type {
   ConnectionStatus,
@@ -22,6 +25,7 @@ import type {
   MeasurementState,
   CgateNetworkInfo,
   ActivityEntry,
+  UiMode,
 } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
@@ -127,6 +131,9 @@ export function App() {
   const [networkHealth, setNetworkHealth] = useState<CgateNetworkInfo | null>(null);
   const [netBusy, setNetBusy] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [uiMode, setUiMode] = useState<UiMode>('operate');
+  const [commissionView, setCommissionView] = useState<'inventory' | 'groups'>('groups');
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   // Labels imported from a project file, re-applied whenever a tree (re)loads.
   const [imported, setImported] = useState<LabelImport | null>(null);
@@ -570,7 +577,32 @@ export function App() {
     }
   }
 
+  async function bulkSetLevel(groups: GroupNode[], level: number) {
+    if (groups.length === 0) return;
+    setBulkBusy(true);
+    setError(null);
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < groups.length) {
+        const g = groups[cursor++];
+        applyLevel(g.address, level);
+        try {
+          await cgate().control.setLevel(refOf(g), level);
+        } catch (e) {
+          setError(errMsg(e));
+        }
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, groups.length) }, worker));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const activeSite = sites.find((s) => s.id === activeSiteId) ?? null;
+  const flatGroups = collectGroups(tree);
 
   return (
     <div className="app">
@@ -584,6 +616,9 @@ export function App() {
             </span>
           )}
         </div>
+        {status === 'connected' && (
+          <ModeToggle mode={uiMode} onChange={setUiMode} disabled={connectBusy} />
+        )}
         {status === 'connected' && (
           <SessionBar
             projects={projects}
@@ -730,16 +765,68 @@ export function App() {
             </div>
           )}
           <div className="main__tree">
-            <DeviceTree
-              tree={tree}
-              states={states}
-              measurements={measurements}
-              actions={status === 'connected' ? actions : undefined}
-              projectName={projectName}
-              connected={status === 'connected' || status === 'reconnecting'}
-              selection={selection}
-              onSelect={setSelection}
-            />
+            {uiMode === 'operate' ? (
+              <DeviceTree
+                tree={tree}
+                states={states}
+                measurements={measurements}
+                actions={status === 'connected' ? actions : undefined}
+                projectName={projectName}
+                connected={status === 'connected' || status === 'reconnecting'}
+                selection={selection}
+                onSelect={setSelection}
+              />
+            ) : (
+              <div className="commission">
+                <div className="commission__bar">
+                  <div className="commission__tabs" role="tablist" aria-label="Commission views">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={commissionView === 'groups'}
+                      className={`commission__tab${commissionView === 'groups' ? ' commission__tab--active' : ''}`}
+                      onClick={() => setCommissionView('groups')}
+                    >
+                      Groups
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={commissionView === 'inventory'}
+                      className={`commission__tab${commissionView === 'inventory' ? ' commission__tab--active' : ''}`}
+                      onClick={() => setCommissionView('inventory')}
+                    >
+                      Inventory
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    disabled={!activeNetwork || netBusy || connectBusy}
+                    onClick={() => void runNetOp('sync')}
+                    title="Sync network and reload the tree (not unit programming)"
+                  >
+                    {netBusy ? 'Refreshing…' : 'Refresh'}
+                  </button>
+                </div>
+                {commissionView === 'groups' ? (
+                  <GroupsWorkspace
+                    groups={flatGroups}
+                    states={states}
+                    selection={selection}
+                    onSelect={setSelection}
+                    onBulkSetLevel={status === 'connected' ? bulkSetLevel : undefined}
+                    bulkBusy={bulkBusy}
+                  />
+                ) : (
+                  <InventoryTable
+                    tree={tree}
+                    selection={selection}
+                    onSelect={setSelection}
+                  />
+                )}
+              </div>
+            )}
           </div>
           {selection && (
             <EntityPanel

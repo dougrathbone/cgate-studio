@@ -141,6 +141,9 @@ export interface TreeChange {
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
+/** Main workspace mode: browse/control tree vs commission tables. */
+export type UiMode = 'operate' | 'commission';
+
 /** Main-process connect() was replaced by a newer connect/disconnect. */
 export const CONNECTION_SUPERSEDED = 'Connection superseded';
 
