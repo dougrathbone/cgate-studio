@@ -65,8 +65,20 @@ export function CgateStatusPanel({
           >
             {loading ? 'Querying…' : 'Refresh'}
           </button>
-          <button type="button" className="btn btn--ghost btn--sm btn--icon" onClick={onClose} aria-label="Close">
-            ×
+          <button
+            type="button"
+            className="statusPanel__close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <path
+                d="M3 3l8 8M11 3L3 11"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         </div>
       </header>
