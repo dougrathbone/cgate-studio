@@ -14,7 +14,7 @@ Open-source community tool. **Not** a Toolkit clone — no unit programming.
 1. Read [`docs/context/session-starter.md`](docs/context/session-starter.md) — the decisions log.
 2. Read the design spec: [`docs/specs/2026-05-30-cbus-studio-design.md`](docs/specs/2026-05-30-cbus-studio-design.md).
 3. Read the implementation plan in `docs/plans/` before writing code.
-4. To reuse the C-Gate client, follow [`docs/context/vendoring-cgate-client.md`](docs/context/vendoring-cgate-client.md).
+4. To reuse the C-Gate client, follow [`docs/context/vendoring-cgate-client.md`](docs/context/vendoring-cgate-client.md) — import `cgateweb/cgate-client`, never the package root.
 
 ## Hard constraints (decided during brainstorming)
 
@@ -32,13 +32,13 @@ Open-source community tool. **Not** a Toolkit clone — no unit programming.
 - **M1** Connect & Browse (read-only): `TREEXML` → tree + live state from event stream.
 - **M2** Commission/Test: switch / ramp / terminate-ramp (transient, no DB writes).
 - **M3** Organize: rename labels + `PROJECT SAVE` (gated, confirm-on-save).
+- **M4–M10** shipped on the Approach A roadmap (scenes, sensors, session, health, commission UI, tag DB, diagnostics). Unit programming remains out of scope.
 
 ## Conventions
 
-- Build M1 → M2 → M3 in order (risk-ordered; DB writes last).
 - Test against a **mock C-Gate** (fake TCP server with canned fixtures); CI must not need real hardware.
-- Keep the vendored `src/cgate-client/` close to upstream `cgateweb` until Phase B extraction.
+- Depend on `cgateweb/cgate-client` at a tagged git ref. Keep only TREEXML / export / the Studio label parser in `src/cgate-client/`.
 
 ## Related repo
 
-- `cgateweb` (sibling): `/Users/doug/Documents/Code/cgateweb` — source of the vendored C-Gate client.
+- `cgateweb`: https://github.com/dougrathbone/cgateweb — protocol client via `cgateweb/cgate-client`.

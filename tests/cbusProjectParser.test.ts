@@ -1,4 +1,4 @@
-// Thorough coverage of the vendored C-Bus project parser across the schema
+// Thorough coverage of the Studio C-Bus project parser across the schema
 // variants and address/tag fallbacks real Toolkit / C-Gate exports use.
 const CbusProjectParser = require('../src/cgate-client/cbusProjectParser');
 

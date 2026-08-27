@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import type { LabelImport } from '../shared/types';
 
-// ES import (not require) so electron-vite inlines the vendored CommonJS parser
-// into the main bundle, mirroring CgateService's handling of the cgate-client.
+// ES import (not require) so electron-vite inlines the CommonJS parser into
+// the main bundle. This parser is Studio-local (network/application labels).
 import CbusProjectParser from '../cgate-client/cbusProjectParser';
 
 interface RawResult {
@@ -26,7 +26,7 @@ function toLabelImport(r: RawResult, filename: string): LabelImport {
 
 // Parse a project file's bytes (.cbz archive or raw .xml) into a LabelImport.
 export async function importLabelsFromBuffer(buffer: Buffer, filename = ''): Promise<LabelImport> {
-  // The vendored parser is plain JS; its inferred shape is too narrow, so treat
+  // The parser is plain JS; its inferred shape is too narrow, so treat
   // the instance as untyped and re-type its result via RawResult.
   const parser: any = new CbusProjectParser();
   const result: RawResult = await parser.parse(buffer, filename);

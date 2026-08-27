@@ -29,6 +29,7 @@ jest.mock('../../src/main/CgateService', () => {
     getTree = jest.fn().mockResolvedValue([]);
     setLevel = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     terminateRamp = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
+    fireScene = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     setName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     setTagName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
     clearTagName = jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] });
@@ -174,12 +175,14 @@ describe('registerIpc', () => {
     const ref = { network: '254', application: '56', group: '4' };
     await lastHandler(CHANNELS.setLevel)({}, ref, 128, 4);
     await lastHandler(CHANNELS.terminateRamp)({}, ref);
+    await lastHandler(CHANNELS.fireScene)({}, ref, 4);
     await lastHandler(CHANNELS.rename)({}, ref, 'Kitchen');
     await lastHandler(CHANNELS.clearTag)({}, ref);
     await lastHandler(CHANNELS.projectSave)({});
     await lastHandler(CHANNELS.projectName)({});
     expect(svc.setLevel).toHaveBeenCalledWith(ref, 128, 4);
     expect(svc.terminateRamp).toHaveBeenCalledWith(ref);
+    expect(svc.fireScene).toHaveBeenCalledWith(ref, 4);
     expect(svc.setName).toHaveBeenCalledWith(ref, 'Kitchen');
     expect(svc.clearTagName).toHaveBeenCalledWith(ref);
     expect(svc.saveProject).toHaveBeenCalled();
@@ -230,6 +233,14 @@ describe('registerIpc', () => {
     expect(imp.groups['254/56/4']).toBe('Kitchen');
   });
 
+  it('project:import uses the BrowserWindow when one is open', async () => {
+    const win = { id: 7 } as any;
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: ['/tmp/home.cbz'] });
+    registerIpc(() => win, fakeStore(), fakeLabelStore());
+    await lastHandler(CHANNELS.projectImport)({});
+    expect(showOpenDialogMock).toHaveBeenCalledWith(win, expect.any(Object));
+  });
+
   it('project:import returns null when the picker is cancelled', async () => {
     showOpenDialogMock.mockResolvedValue({ canceled: true, filePaths: [] });
     importMock.mockClear();
@@ -247,6 +258,29 @@ describe('registerIpc', () => {
     expect(showSaveDialogMock).toHaveBeenCalled();
     expect(exportMock).toHaveBeenCalledWith('/tmp/out.xml', input);
     expect(result?.stats.labelCount).toBe(2);
+  });
+
+  it('project:export uses the BrowserWindow when one is open', async () => {
+    const win = { id: 8 } as any;
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/out.xml' });
+    registerIpc(() => win, fakeStore(), fakeLabelStore());
+    await lastHandler(CHANNELS.projectExport)({}, { tree: [], projectName: 'MYPROJ' });
+    expect(showSaveDialogMock).toHaveBeenCalledWith(win, expect.any(Object));
+  });
+
+  it('project:export returns null when the picker is cancelled', async () => {
+    showSaveDialogMock.mockResolvedValue({ canceled: true, filePath: undefined });
+    exportMock.mockClear();
+    registerIpc(() => null, fakeStore(), fakeLabelStore());
+    const result = await lastHandler(CHANNELS.projectExport)({}, { tree: [], projectName: 'X' });
+    expect(result).toBeNull();
+    expect(exportMock).not.toHaveBeenCalled();
+  });
+
+  it('routes nodes:networkLevels with optional applications', async () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    await lastHandler(CHANNELS.networkLevels)({}, '254', ['56']);
+    expect(svc.getNetworkLevels).toHaveBeenCalledWith('254', ['56']);
   });
 
   it('removes persisted labels when a site is deleted', async () => {

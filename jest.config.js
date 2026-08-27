@@ -13,6 +13,7 @@ module.exports = {
     // pure framework wiring, exercised by launch rather than unit tests.
     '!src/main/index.ts',
     '!src/renderer/main.tsx',
+    '!src/**/*.d.ts',
   ],
   coveragePathIgnorePatterns: ['/node_modules/'],
   coverageThreshold: {

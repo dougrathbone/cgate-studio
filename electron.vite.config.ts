@@ -5,10 +5,9 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: { input: 'src/main/index.ts' },
-      // The vendored cgate-client modules are CommonJS (module.exports). Vite's
-      // commonjs transform only covers node_modules by default, so include the
-      // vendored source too — otherwise Rollup can't resolve our ESM imports of
-      // them and they'd be left as broken runtime requires.
+      // cgateweb/cgate-client and the Studio-local parser/exporter/TREEXML
+      // helpers are CommonJS. Vite's commonjs transform covers node_modules
+      // by default; include the local cgate-client folder too.
       commonjsOptions: { include: [/node_modules/, /cgate-client/] },
     },
   },

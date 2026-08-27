@@ -63,6 +63,33 @@ describe('GroupsWorkspace', () => {
     confirmSpy.mockRestore();
   });
 
+  it('select-all, bulk On/50%, and cancel clear-label cover remaining toolbar paths', () => {
+    const onBulkSetLevel = jest.fn();
+    const onClearLabels = jest.fn();
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    render(
+      <GroupsWorkspace
+        groups={groups}
+        states={{ '254/56/4': { address: '254/56/4', level: 10, on: true, ramping: false } }}
+        onBulkSetLevel={onBulkSetLevel}
+        onClearLabels={onClearLabels}
+        onSelect={jest.fn()}
+        selection={{ kind: 'group', group: groups[0] }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('Select all visible groups'));
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'On' }));
+    fireEvent.click(screen.getByRole('button', { name: '50%' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear label' }));
+    expect(onBulkSetLevel).toHaveBeenCalledWith(groups, 255);
+    expect(onBulkSetLevel).toHaveBeenCalledWith(groups, 128);
+    expect(onClearLabels).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('Select all visible groups'));
+    fireEvent.click(screen.getByText('Kitchen'));
+    confirmSpy.mockRestore();
+  });
+
   it('focuses the filter when / is pressed', () => {
     render(<GroupsWorkspace groups={groups} states={{}} />);
     const input = screen.getByLabelText('Filter groups');

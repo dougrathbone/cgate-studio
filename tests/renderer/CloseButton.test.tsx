@@ -17,4 +17,9 @@ describe('CloseButton', () => {
     fireEvent.click(btn);
     expect(onClick).toHaveBeenCalled();
   });
+
+  it('appends an extra className when provided', () => {
+    render(<CloseButton onClick={() => {}} className="extra" label="Dismiss" />);
+    expect(screen.getByLabelText('Dismiss')).toHaveClass('closeBtn', 'extra');
+  });
 });
