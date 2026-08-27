@@ -7,13 +7,13 @@ export interface MockCgateHandle {
   close: () => Promise<void>;
   // Push a raw line (CRLF appended) to all connected event-port clients.
   pushEvent: (line: string) => void;
-  // Command lines received from clients (excludes EVENT ON / LOGIN / keep-alive
+  // Command lines received from clients (excludes EVENT / LOGIN / keep-alive
   // handshake noise), so tests can assert exactly what was sent.
   commands: string[];
 }
 
 // Starts a fake C-Gate on an ephemeral port. The command port answers
-// `EVENT ON`/`LOGIN` with `200 OK`, answers `TREEXML <n>` with the fixture,
+// `EVENT …`/`LOGIN` with `200 OK`, answers `TREEXML <n>` with the fixture,
 // and stores the latest socket so tests can push events to it.
 export async function startMockCgate(): Promise<MockCgateHandle> {
   const fixture = fs.readFileSync(
@@ -35,7 +35,7 @@ export async function startMockCgate(): Promise<MockCgateHandle> {
       while ((idx = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, idx).replace(/\r$/, '');
         buffer = buffer.slice(idx + 1);
-        if (/^EVENT ON/i.test(line) || /^LOGIN/i.test(line) || line.startsWith('#')) {
+        if (/^EVENT\b/i.test(line) || /^LOGIN/i.test(line) || line.startsWith('#')) {
           socket.write('200 OK.\r\n');
         } else if (/^TREEXML/i.test(line)) {
           commands.push(line);

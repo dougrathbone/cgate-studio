@@ -55,6 +55,33 @@ describe('preload bridge', () => {
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:state', expect.any(Function));
   });
 
+  it('subscribes to trigger, treeChanged, measurement, and activity events', () => {
+    const trigger = jest.fn();
+    const tree = jest.fn();
+    const measurement = jest.fn();
+    const activity = jest.fn();
+    const offT = api.onTrigger(trigger);
+    const offC = api.onTreeChanged(tree);
+    const offM = api.onMeasurement(measurement);
+    const offA = api.onActivity(activity);
+    listeners['cgate:trigger']({}, { address: '254/202/1' });
+    listeners['cgate:treeChanged']({}, { network: '254' });
+    listeners['cgate:measurement']({}, { address: '254/228/1', value: 21 });
+    listeners['cgate:activity']({}, { command: 'ON' });
+    expect(trigger).toHaveBeenCalled();
+    expect(tree).toHaveBeenCalled();
+    expect(measurement).toHaveBeenCalled();
+    expect(activity).toHaveBeenCalled();
+    offT();
+    offC();
+    offM();
+    offA();
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:trigger', expect.any(Function));
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:treeChanged', expect.any(Function));
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:measurement', expect.any(Function));
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:activity', expect.any(Function));
+  });
+
   it('exposes a sites API mapped to the sites IPC channels', async () => {
     const input = { name: 'Home', host: 'h', commandPort: 1, eventPort: 2 };
     await api.sites.list();
@@ -75,7 +102,9 @@ describe('preload bridge', () => {
     const ref = { network: '254', application: '56', group: '4' };
     await api.control.setLevel(ref, 128, 4);
     await api.control.terminateRamp(ref);
+    await api.control.fireScene(ref, 4);
     await api.labels.rename(ref, 'Kitchen');
+    await api.labels.clear(ref);
     await api.project.save();
     await api.project.name();
     await api.project.dir();
@@ -100,7 +129,9 @@ describe('preload bridge', () => {
     await api.nodes.setUnitName('254', '10', 'Hall');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:setLevel', ref, 128, 4);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:terminateRamp', ref);
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:fireScene', ref, 4);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('labels:rename', ref, 'Kitchen');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('labels:clear', ref);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:save');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:name');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('project:dir');

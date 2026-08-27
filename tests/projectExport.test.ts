@@ -57,6 +57,32 @@ describe('projectExport', () => {
     expect(stats).toEqual({ networkCount: 1, groupCount: 1, labelCount: 1, unitCount: 1 });
   });
 
+  it('buildLabelsCsv escapes commas/quotes and counts unlabelled groups', () => {
+    const messy = [{
+      ...tree[0],
+      units: [] as typeof tree[0]['units'],
+      applications: [{
+        ...tree[0].applications[0],
+        groups: [
+          { ...tree[0].applications[0].groups[0], label: 'Hall, "Main"' },
+          {
+            kind: 'group' as const,
+            address: '254/56/5',
+            network: '254',
+            application: '56',
+            group: '5',
+            label: null,
+          },
+        ],
+      }],
+    }];
+    const { csv, stats } = buildLabelsCsv(messy as typeof tree);
+    expect(csv).toContain('"Hall, ""Main"""');
+    expect(stats.groupCount).toBe(2);
+    expect(stats.labelCount).toBe(1);
+    expect(stats.unitCount).toBe(0);
+  });
+
   it('buildLabelsCsv returns a header and group rows', () => {
     const { csv, stats } = buildLabelsCsv(tree);
     expect(csv).toContain('network,application,group,address,label');

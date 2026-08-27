@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { LabelExportInput, LabelExportResult, Tree } from '../shared/types';
 
-// ES import so electron-vite bundles the vendored CommonJS exporter into main.
+// ES import so electron-vite bundles the CommonJS exporter into main.
 import { exportLabelsXml } from '../cgate-client/cbusProjectExporter';
 const AdmZip = require('adm-zip');
 

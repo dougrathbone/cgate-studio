@@ -1,4 +1,4 @@
-// Coverage of the vendored C-Bus project exporter: Toolkit-compatible XML shape,
+// Coverage of the C-Bus project exporter: Toolkit-compatible XML shape,
 // sorting, escaping, units, and round-trip through cbusProjectParser.
 const { parseString } = require('xml2js');
 const AdmZip = require('adm-zip');

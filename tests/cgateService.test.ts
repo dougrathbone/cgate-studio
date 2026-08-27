@@ -323,7 +323,7 @@ describe('CgateService', () => {
       svc = new CgateService();
       svc.on('state', collect);
       await svc.connect({ host: '127.0.0.1', commandPort: mock.port, eventPort: mock.port });
-      // Settle the first connection (drain its EVENT ON `200 OK.` ack and let the
+      // Settle the first connection (drain its EVENT `200 OK.` ack and let the
       // event socket register) before reconnecting. This keeps the teardown a
       // clean close so the mock — whose sockets have no 'error' listener — isn't
       // hit by an abortive-reset read during the reconnect.

@@ -24,7 +24,7 @@ describe('CgateService edge cases', () => {
           while ((idx = buffer.indexOf('\n')) !== -1) {
             const line = buffer.slice(0, idx).replace(/\r$/, '');
             buffer = buffer.slice(idx + 1);
-            if (/^EVENT ON|^LOGIN|^#/i.test(line)) s.write('200 OK.\r\n');
+            if (/^EVENT\b|^LOGIN|^#/i.test(line)) s.write('200 OK.\r\n');
             else if (/^PROJECT LIST/i.test(line)) s.write('124 no projects found\r\n200 OK.\r\n');
             else if (/^TREEXML/i.test(line)) s.write('343-Begin\r\n343-<Network\r\n344 End.\r\n');
           }

@@ -1,13 +1,15 @@
 const path = require('path');
 const AdmZip = require('adm-zip');
 const { parseString } = require('xml2js');
-const { createLogger } = require('./logger');
+const { createLogger } = require('cgateweb/cgate-client');
 
-// Vendored from the sibling `cgateweb` project (src/cbusProjectParser.js) — see
-// docs/context/vendoring-cgate-client.md. Kept close to upstream; the only
-// deviation is _extractLabels also collecting network/application tag names
-// (networkLabels / applicationLabels) so the desktop tree can be re-labelled at
-// every level, not just groups.
+// Studio-local fork of cgateweb's CbusProjectParser. Upstream lives behind
+// `cgateweb/cgate-client/project` but does not return network/application
+// TagNames, and its sqlite path pulls sql.js WASM that asar packaging does
+// not yet locate. Keep this copy until those land upstream. The only
+// Studio-specific behaviour is _extractLabels also collecting
+// networkLabels / applicationLabels so the desktop tree can be re-labelled
+// at every level, not just groups.
 
 // Maximum total decompressed bytes we will pull out of a .cbz archive.
 // .cbz files are XML payloads zipped together; typical real files are well

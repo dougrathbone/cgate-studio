@@ -1,49 +1,36 @@
-# Vendoring the C-Gate client (Phase A)
+# C-Gate client (Phase B)
 
-CBus Studio reuses the tested C-Gate protocol client from `cgateweb`. In Phase A
-we **copy** the relevant modules into this repo to move fast. In Phase B we extract
-them into a shared `cgate-client` npm package consumed by both projects.
+CBus Studio consumes the protocol surface of [`cgateweb`](https://github.com/dougrathbone/cgateweb)
+as a git dependency. Import **only** the library barrels — never the package root:
 
-**Source repo:** `/Users/doug/Documents/Code/cgateweb` (modules under `src/`).
-**Target:** `src/cgate-client/` in this repo.
+```js
+require('cgateweb/cgate-client')           // transport, parsers, protocol constants
+require('cgateweb/cgate-client/project')   // Toolkit project parser (sql.js / zip)
+```
 
-## Modules to vendor
+The bare `cgateweb` entry is the MQTT/HA **bridge application**. It loads
+`settings.js` from the cwd, writes to stdout, and can call `process.exit`.
+The barrels are import-pure.
 
-Protocol client (no MQTT/HA coupling):
+Pin the dependency to a **cgateweb release tag** in `package.json`
+(currently `github:dougrathbone/cgateweb#v1.32.0`). Bump the tag when you
+want protocol fixes; do not track `master`.
 
-| Module | Purpose | Internal deps | External (npm) deps |
-|---|---|---|---|
-| `cgateConnection.js` | Single TCP connection + reconnect | `logger`, `backoff`, `constants` | — (`net`, `events` built-in) |
-| `cgateConnectionPool.js` | Pool of command connections, round-robin, health | `cgateConnection`, `logger`, `constants`, `backoff` | — |
-| `connectionManager.js` | Higher-level connect/disconnect orchestration | (verify on copy) | — |
-| `cbusEvent.js` | Parse event/status-stream lines | `logger`, `constants` | — |
-| `cbusCommand.js` | Build C-Gate commands | (verify on copy) | — |
-| `commandResponseProcessor.js` | Match responses to commands | (verify on copy) | — |
-| `lineProcessor.js` | Frame TCP stream into lines | (verify on copy) | — |
-| `cbusProjectParser.js` | TREEXML → network tree | `logger` | `adm-zip`, `xml2js` |
-| `labelLoader.js` | Load label/tag data | (verify on copy) | (verify on copy) |
+## What Studio still keeps locally (`src/cgate-client/`)
 
-Shared base modules these depend on (vendor these too):
+These modules have no equivalent in the cgateweb barrels (or need Studio-only
+behaviour):
 
-- `constants.js` — regexes (`EVENT_REGEX`), response codes, `NEWLINE`, etc.
-- `logger.js` — `createLogger` (consider swapping for an Electron-friendly logger later).
-- `backoff.js` — `backoffDelay(retryNumber, { initialMs, maxMs, jitter })`.
+| File | Why local |
+|---|---|
+| `treexml.js` | C-Gate `TREEXML` line-stripping + tree parse for the desktop UI |
+| `cbusProjectExporter.js` | Toolkit-compatible XML/CBZ **export** (CSV is in `projectExport.ts`) |
+| `cbusProjectParser.js` | Fork that also returns `networkLabels` / `applicationLabels`. Upstream `cgateweb/cgate-client/project` is group-labels only and lazy-loads sql.js WASM, which asar packaging does not yet locate |
 
-## npm dependencies to add
+Do not vendor `cgateConnection.js`, `cbusEvent.js`, `constants.js`, `logger.js`,
+or `backoff.js` again — they come from the barrel.
 
-- `adm-zip` — used by `cbusProjectParser` (project DB zip handling).
-- `xml2js` — used by `cbusProjectParser` (TREEXML parsing).
+## Adding something missing from the barrel
 
-## Procedure
-
-1. Copy the modules above into `src/cgate-client/`, preserving relative `require('./...')` paths.
-2. Run an import-resolution pass: from a scratch script, `require('./src/cgate-client/cgateConnectionPool')` and friends; add any module the resolver complains about (the "verify on copy" rows). Repeat until it resolves cleanly.
-3. Copy the corresponding Jest tests from `cgateweb/tests/` for the vendored modules; get them green here. These are your regression safety net.
-4. Keep a `VENDORED_FROM.md` noting the source commit SHA of `cgateweb` so Phase B extraction can diff against upstream.
-
-## Phase B (later)
-
-Once the prototype is validated against a real CNI, extract `src/cgate-client/`
-into a standalone `cgate-client` npm package with a documented public API, publish
-it (or use a workspace/local link), and have **both** CBus Studio and `cgateweb`
-depend on it. Delete the vendored copy here in favour of the dependency.
+If Studio needs a protocol symbol that is not exported, add it **upstream** in
+cgateweb and bump the git tag here. Do not copy files back into this repo.

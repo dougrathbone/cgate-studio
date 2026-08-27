@@ -25,13 +25,12 @@ import { parseNetworkLines, parseNetworkHealthFromGet } from './cgateSessionPars
 import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
 import { parseMeasurementEvent } from './measurementParse';
 
-// Use ES imports (not require) so the bundler inlines the vendored client into
-// the main-process bundle; otherwise the relative requires resolve against
-// out/main/ at runtime and fail (Electron: "Cannot find module ...").
-import CgateConnection from '../cgate-client/cgateConnection';
-import CBusEvent from '../cgate-client/cbusEvent';
+// Import from cgateweb's protocol barrel (not the app entry). electron-vite
+// inlines the CommonJS modules into the main bundle.
+import { CgateConnection, CBusEvent, constants } from 'cgateweb/cgate-client';
 import { parseTreeXml } from '../cgate-client/treexml';
-import { CGATE_RESPONSE_SYSTEM_EVENT } from '../cgate-client/constants';
+
+const { CGATE_RESPONSE_SYSTEM_EVENT } = constants;
 
 const TREE_START = /^343/m;
 const TREE_END = /^344[ \t]/m;
@@ -61,7 +60,7 @@ export class CgateService extends EventEmitter {
   private commandQueue: Array<() => void> = [];
   // Single persistent reader for the command connection. Complete lines are fed
   // to the active consumer (a getTree or sendCommand in progress); lines that
-  // arrive with no active consumer (the connect greeting, the EVENT ON / LOGIN
+  // arrive with no active consumer (the connect greeting, the EVENT / LOGIN
   // acks, stray async output) are discarded so they can't contaminate the next
   // command's response. A StringDecoder ensures multibyte UTF-8 characters split
   // across socket chunks aren't corrupted (M6).
@@ -177,7 +176,7 @@ export class CgateService extends EventEmitter {
       this.setStatus('error');
       throw e;
     }
-    // Drain the command-connection handshake (greeting + EVENT ON / LOGIN acks)
+    // Drain the command-connection handshake (greeting + EVENT / LOGIN acks)
     // before allowing commands, so those unsolicited responses can't be
     // mistaken for the reply to the first command we send.
     await this.drainHandshake();
@@ -187,7 +186,7 @@ export class CgateService extends EventEmitter {
 
   // Consume and discard command-stream lines until the stream goes quiet,
   // bounded by a hard cap. Used once after connect to swallow the greeting and
-  // the EVENT ON / LOGIN acknowledgements.
+  // the EVENT / LOGIN acknowledgements.
   private drainHandshake(quietMs = 120, maxMs = 1000): Promise<void> {
     return new Promise((resolve) => {
       let quietTimer: ReturnType<typeof setTimeout>;

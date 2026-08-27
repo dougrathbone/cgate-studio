@@ -38,6 +38,7 @@ const homeSite: Site = { id: 'a', name: 'Home', host: '10.0.0.1', commandPort: 2
 function installApi(initialSites: Site[] = [homeSite]) {
   let statusCb: (s: any) => void = () => {};
   let stateCb: (s: any) => void = () => {};
+  let triggerCb: (s: any) => void = () => {};
   let persistedGlobal: LabelImport | null = null;
   const persistedBySite: Record<string, LabelImport> = {};
   const api = {
@@ -59,7 +60,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     }),
     onStatus: jest.fn((cb: any) => { statusCb = cb; return jest.fn(); }),
     onState: jest.fn((cb: any) => { stateCb = cb; return jest.fn(); }),
-    onTrigger: jest.fn(() => jest.fn()),
+    onTrigger: jest.fn((cb: any) => { triggerCb = cb; return jest.fn(); }),
     onMeasurement: jest.fn((cb: any) => { return jest.fn(); }),
     onTreeChanged: jest.fn(() => jest.fn()),
     onActivity: jest.fn(() => jest.fn()),
@@ -121,10 +122,11 @@ function installApi(initialSites: Site[] = [homeSite]) {
       getUnitParams: jest.fn().mockResolvedValue({ Name: 'DIMMER' }),
       setGroupParam: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
       setUnitName: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
+      identifyUnit: jest.fn().mockResolvedValue({ code: 200, text: 'OK.', lines: [] }),
     },
   };
   (window as any).cgate = api;
-  return { api, fireStatus: (s: any) => statusCb(s), fireState: (s: any) => stateCb(s) };
+  return { api, fireStatus: (s: any) => statusCb(s), fireState: (s: any) => stateCb(s), fireTrigger: (s: any) => triggerCb(s) };
 }
 
 describe('App', () => {
@@ -499,5 +501,26 @@ describe('App', () => {
     expect(offMeasurement).toHaveBeenCalled();
     expect(offTreeChanged).toHaveBeenCalled();
     expect(offActivity).toHaveBeenCalled();
+  });
+
+  it('switches to Commission views, opens status, and shows last-fired trigger', async () => {
+    const { fireStatus, fireTrigger } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    await act(async () => { fireEvent.click(screen.getByText('Connect')); });
+    act(() => fireStatus('connected'));
+    fireEvent.click(screen.getByRole('button', { name: /C-Gate status/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Commission' }));
+    expect(await screen.findByRole('tab', { name: 'Groups' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Inventory' }));
+    expect(screen.getByRole('tab', { name: 'Inventory' })).toHaveAttribute('aria-selected', 'true');
+    act(() => fireTrigger({
+      address: '254/202/1',
+      network: '254',
+      application: '202',
+      group: '1',
+      actionSelector: 4,
+    }));
+    expect(await screen.findByText(/Fired 254\/202\/1/)).toBeInTheDocument();
   });
 });

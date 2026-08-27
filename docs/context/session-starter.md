@@ -21,7 +21,7 @@ Full design: [`../specs/2026-05-30-cbus-studio-design.md`](../specs/2026-05-30-c
 | Out of scope | Unit programming (Tier 3), MQTT/HA, bundled C-Gate, serial PCI | Proprietary / different product / risk |
 | UI stack | Electron + React | Reuses cgateweb's JS C-Gate client; cross-platform for free |
 | C-Gate relationship | Connect to an existing C-Gate | Simplest, zero licensing concern; managed mode deferred |
-| Code reuse | Phased A→B: vendor cgateweb client now, extract shared `cgate-client` package later | Fast prototype now, maintainable end state later |
+| Code reuse | Depend on `cgateweb/cgate-client` (git tag); keep TREEXML/export/parser local | Phase B unblocked; barrels are import-pure |
 | Repo strategy | New standalone repo (this one), NOT a cgateweb monorepo sub-package | GUI and headless bridge are different products/audiences |
 
 ## Milestones (risk-ordered)
@@ -38,20 +38,20 @@ Full design: [`../specs/2026-05-30-cbus-studio-design.md`](../specs/2026-05-30-c
 
 ## Architecture (one-liner)
 
-Electron **main** owns all C-Gate I/O via the vendored client and a `CgateService`
-facade; **renderer** (React) talks to main over a typed, context-isolated IPC
-bridge and never opens sockets.
+Electron **main** owns all C-Gate I/O via `cgateweb/cgate-client` and a
+`CgateService` facade; **renderer** (React) talks to main over a typed,
+context-isolated IPC bridge and never opens sockets.
 
 ## Where things live
 
 - Spec: `docs/specs/2026-05-30-cbus-studio-design.md`
 - Plan: `docs/plans/` (implementation plan)
-- Vendoring guide: `docs/context/vendoring-cgate-client.md`
-- Source `cgateweb` repo to vendor from: `/Users/doug/Documents/Code/cgateweb`
+- C-Gate client: [`vendoring-cgate-client.md`](vendoring-cgate-client.md) (git dependency on `cgateweb/cgate-client`)
+- Source `cgateweb` repo: https://github.com/dougrathbone/cgateweb
 
 ## First implementation steps (once planning is done)
 
 1. Scaffold Electron + React + TypeScript project (main/preload/renderer split).
-2. Vendor the C-Gate client modules (see vendoring guide) into `src/cgate-client/`.
+2. Depend on `cgateweb/cgate-client` (see the C-Gate client guide).
 3. Build `CgateService` (main) + a mock C-Gate test server.
 4. M1 UI: connection form + tree browser + live-state badges.

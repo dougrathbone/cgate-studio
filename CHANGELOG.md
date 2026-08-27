@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0](https://github.com/dougrathbone/cgate-studio/compare/v1.2.0...v1.3.0) (2026-08-27)
+
+### Features
+
+* **session:** project and network pickers (`PROJECT DIR`/`LIST`/`LOAD`/`START`/`USE`, `NET LIST`); explicit disconnect; site edit + optional LOGIN (M6)
+* **network:** health status bar (State / InterfaceState / SyncState), Open / Close / Sync, `FORCE` when unsynced, activity drawer (M7)
+* **ui:** Operate / Commission modes with inventory, groups workspace, bulk on/off/level (M8)
+* **tags:** TagName rename, soft-delete to `<Unused>`, dirty banner aligned with EntityPanel SETs, live vs tag mismatch cue (M9)
+* **diagnostics:** unit Identify (`ID`), CSV tag export, `/` focuses the active filter, per-application bulk `GET …/* level` (M10)
+* **cgate:** depend on `cgateweb/cgate-client` v1.32.0 instead of a vendored protocol copy (command handshake is now `EVENT e6s0c0`)
+
+### Bug Fixes
+
+* **cgate:** C-Gate 3.x list framing and `DBGET` slash paths
+* **ui:** header / sidebar layout, shared square close control, C-Gate status panel spacing
+
+### Documentation
+
+* document M6–M10 in the README; record ISC license (LICENSE already shipped)
+
 ## [1.2.0](https://github.com/dougrathbone/cgate-studio/compare/v1.1.0...v1.2.0) (2026-06-28)
 
 

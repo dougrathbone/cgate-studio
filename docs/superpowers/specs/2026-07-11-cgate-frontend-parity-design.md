@@ -32,7 +32,7 @@ Toolkit / SpaceLogic Commission remain the unit programmers.
 
 Unchanged core:
 
-- Electron **main** owns all C-Gate I/O via `CgateService` + vendored client
+- Electron **main** owns all C-Gate I/O via `CgateService` + `cgateweb/cgate-client`
 - Renderer talks only over typed IPC (`contextIsolation`, no `nodeIntegration`)
 - Mock C-Gate for CI; hardware smoke checklists for live validation
 

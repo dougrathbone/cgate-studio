@@ -102,10 +102,47 @@ its documented interface." CBus Studio is that front-end.
 - Initial group levels are **hydrated in one bulk query** at connect (falling
   back to per-group reads), so large networks populate faster.
 
-> **Note:** the exact C-Gate wire format for firing triggers, measurement events,
-> and the bulk-level query are validated against live hardware — see the
-> `docs/smoke-checklist-m4.md` / `-m5.md` checklists. These paths fail safe
-> (inert or graceful fallback) until confirmed on a real C-Gate.
+> **Note:** trigger fire (`TRIGGER EVENT`), measurement events, and per-application
+> bulk `GET //proj/net/<app>/* level` are validated against C-Gate 3.3.2 — see
+> `docs/smoke-checklist-m4.md` / `-m5.md` / `-m10.md`. Network-wide `GET …/* level`
+> is rejected by 3.x when any application lacks `level`.
+
+### Session & project (M6)
+
+- Explicit **Disconnect** (no auto-reconnect). **Edit** a saved site any time
+  (host, ports, optional LOGIN, default project/network).
+- Header **project** picker: `PROJECT DIR` / `LIST` / `LOAD` / `START` / `USE`.
+- Header **network** picker from `NET LIST` — no hardcoded network address.
+- Project-qualified `TREEXML //project/<net>` with a bare-net fallback for older
+  C-Gate.
+
+### Network health (M7)
+
+- **Open / Close / Sync** from the status bar (`NET OPEN` / `CLOSE`, `DO <net> SYNC`).
+- Live **State / InterfaceState / SyncState**. Lighting commands append `FORCE`
+  when the network is unsynced (`State=new`).
+- Optional **Activity** drawer of recent C-Gate command traffic.
+
+### Commission (M8)
+
+- Dual mode: **Operate** (homeowner tree + controls) and **Commission**
+  (inventory, filterable Groups workspace, scan/refresh, bulk on/off/level).
+- Richer unit inspector — still no programming tabs.
+
+### Tag DB (M9)
+
+- Rename and **soft-delete** group TagNames (`DBSET …/TagName`, `<Unused>`),
+  then persist with confirm-gated **`PROJECT SAVE`**.
+- EntityPanel project SETs mark the dirty banner. Mismatch cue when TagName and
+  live Name differ.
+- Structural **add group** is not available on C-Gate 3.3.2 over TCP.
+
+### Diagnostics (M10)
+
+- **Identify** a physical unit (`ID`). C-Gate may return `521` if the unit is
+  unavailable — the UI surfaces that instead of claiming success.
+- **CSV** export of group tags alongside XML/CBZ.
+- Keyboard: **`/`** focuses the visible filter; **Escape** clears it.
 
 ### Reliability
 
@@ -164,7 +201,7 @@ npm run test:coverage # run tests + enforce the 80% coverage threshold
 npm run build        # production build (main + preload + renderer)
 ```
 
-The full stack — vendored C-Gate client, the main-process `CgateService`, the
+The full stack — `cgateweb/cgate-client`, the main-process `CgateService`, the
 IPC/preload bridge, and the React renderer — is unit-tested (renderer components
 via `@testing-library/react` under jsdom; all networked logic against the
 in-process mock C-Gate). CI enforces a global **80% coverage** floor.
@@ -222,7 +259,7 @@ built-in `GITHUB_TOKEN`, so there are no extra secrets to configure.
 │  ┌──────────────────┐  IPC   ┌──────────────────────────┐   │
 │  │ Site list / form │◄──────►│ CgateService             │   │
 │  │ Device tree      │        │  ├─ SiteStore (persisted)│   │
-│  │ Group controls   │        │  └─ vendored cgate-client│───┼──TCP──► C-Gate ──► CNI ──► C-Bus
+│  │ Group controls   │        │  └─ cgateweb/cgate-client│───┼──TCP──► C-Gate ──► CNI ──► C-Bus
 │  │ + rename / save  │        │     (conn, parsers,       │   │
 │  └──────────────────┘        │      TREEXML, events)     │   │
 │                              └──────────────────────────┘   │
@@ -240,11 +277,11 @@ built-in `GITHUB_TOKEN`, so there are no extra secrets to configure.
 
 ## Relationship to cgateweb
 
-CBus Studio reuses the tested C-Gate protocol client from the sibling
-[`cgateweb`](https://github.com/dougrathbone/cgateweb) project (connection,
-event/command parsers, TREEXML handling). For now those modules are **vendored**
-into `src/cgate-client/`; the plan is to later extract them into a shared
-`cgate-client` package depended on by both projects. See
+CBus Studio depends on the protocol barrels from
+[`cgateweb`](https://github.com/dougrathbone/cgateweb) (`cgateweb/cgate-client`,
+pinned to a release tag). Import those subpaths — never the package root, which
+is the MQTT/HA bridge application. TREEXML parsing, label export, and the
+Studio-specific project-label parser stay in `src/cgate-client/`. See
 [`docs/context/vendoring-cgate-client.md`](docs/context/vendoring-cgate-client.md).
 
 ## Non-goals
@@ -257,4 +294,4 @@ into `src/cgate-client/`; the plan is to later extract them into a shared
 
 ## License
 
-TBD (intended open source).
+[ISC](LICENSE) — Copyright 2026 Doug Rathbone.
