@@ -49,4 +49,11 @@ describe('UpdateBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: /Dismiss/i }));
     expect(onDismiss).toHaveBeenCalled();
   });
+
+  it('renders an error without a message', () => {
+    render(
+      <UpdateBanner status={{ state: 'error' }} onRestart={jest.fn()} onDismiss={jest.fn()} />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Update check failed');
+  });
 });

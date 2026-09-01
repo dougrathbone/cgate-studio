@@ -1,17 +1,19 @@
 import { bindAutoUpdater, shouldCheckForUpdates, type UpdateFeed } from '../../src/main/autoUpdate';
 import type { AppUpdateStatus } from '../../src/shared/types';
 
-function fakeFeed(): UpdateFeed & { listeners: Record<string, Function[]>; fail: boolean } {
+function fakeFeed(): UpdateFeed & { listeners: Record<string, Function[]>; fail: boolean; failNonError: boolean } {
   const listeners: Record<string, Function[]> = {};
   return {
     autoDownload: false,
     listeners,
     fail: false,
+    failNonError: false,
     on(event, listener) {
       (listeners[event] ||= []).push(listener);
     },
     async checkForUpdates() {
       if (this.fail) throw new Error('network');
+      if (this.failNonError) throw 'offline';
       return { updateInfo: { version: '1.4.0' } };
     },
     quitAndInstall: jest.fn(),
@@ -40,15 +42,25 @@ describe('bindAutoUpdater', () => {
     for (const fn of feed.listeners['download-progress']) fn({ percent: 42.2 });
     for (const fn of feed.listeners['update-downloaded']) fn({ version: '1.4.0' });
     for (const fn of feed.listeners['update-not-available']) fn();
+    for (const fn of feed.listeners['update-available']) fn(null);
+    for (const fn of feed.listeners['update-available']) fn({});
+    for (const fn of feed.listeners['download-progress']) fn(null);
+    for (const fn of feed.listeners['download-progress']) fn({ percent: Number.NaN });
+    for (const fn of feed.listeners['update-downloaded']) fn(undefined);
     for (const fn of feed.listeners['error']) fn(new Error('boom'));
+    for (const fn of feed.listeners['error']) fn('nope');
 
     expect(sent).toEqual(expect.arrayContaining([
       { state: 'checking' },
       { state: 'available', version: '1.4.0' },
+      { state: 'available', version: undefined },
       { state: 'downloading', percent: 42.2 },
+      { state: 'downloading', percent: undefined },
       { state: 'ready', version: '1.4.0' },
+      { state: 'ready', version: undefined },
       { state: 'not-available' },
       { state: 'error', message: 'boom' },
+      { state: 'error', message: 'nope' },
     ]));
 
     await handle.check();
@@ -65,5 +77,14 @@ describe('bindAutoUpdater', () => {
     const handle = bindAutoUpdater(feed, (s) => sent.push(s));
     await handle.check();
     expect(sent[sent.length - 1]).toEqual({ state: 'error', message: 'network' });
+  });
+
+  it('stringifies non-Error check failures', async () => {
+    const feed = fakeFeed();
+    feed.failNonError = true;
+    const sent: AppUpdateStatus[] = [];
+    const handle = bindAutoUpdater(feed, (s) => sent.push(s));
+    await handle.check();
+    expect(sent[sent.length - 1]).toEqual({ state: 'error', message: 'offline' });
   });
 });
