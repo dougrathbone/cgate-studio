@@ -1,9 +1,10 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import path from 'path';
-import { registerIpc } from './ipc';
+import { registerIpc, CHANNELS } from './ipc';
 import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
 import { APP_NAME, buildAppMenuTemplate, configureAboutPanel } from './about';
+import { initAutoUpdate } from './autoUpdateInit';
 
 // Override the name Electron shows in the macOS menu bar, dock, and About panel.
 // Without this, an unpackaged/dev run reports the generic "Electron" name.
@@ -38,17 +39,20 @@ function createWindow() {
   }
 }
 
-function buildAppMenu() {
-  Menu.setApplicationMenu(Menu.buildFromTemplate(buildAppMenuTemplate(() => win)));
-}
-
 app.whenReady().then(() => {
   configureAboutPanel();
-  buildAppMenu();
   const siteStore = new SiteStore(path.join(app.getPath('userData'), 'sites.json'));
   const labelStore = new LabelStore(path.join(app.getPath('userData'), 'labels.json'));
-  registerIpc(() => win, siteStore, labelStore);
+  const updates = initAutoUpdate(
+    (status) => win?.webContents.send(CHANNELS.updateStatus, status),
+    () => win,
+  );
+  registerIpc(() => win, siteStore, labelStore, updates);
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(buildAppMenuTemplate(() => win, { onCheckForUpdates: () => { void updates.check(); } })),
+  );
   createWindow();
+  void updates.check();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

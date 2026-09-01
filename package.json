@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "dist": "npm run build && electron-builder --publish never",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
-    "dist:win": "npm run build && electron-builder --win --publish never"
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never"
   },
   "keywords": [],
   "author": "Doug Rathbone",
@@ -26,6 +27,7 @@
   "dependencies": {
     "adm-zip": "^0.5.17",
     "cgateweb": "github:dougrathbone/cgateweb#v1.32.0",
+    "electron-updater": "^6.8.9",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

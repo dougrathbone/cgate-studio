@@ -17,6 +17,7 @@ import type {
   MeasurementState,
   CgateNetworkInfo,
   ActivityEntry,
+  AppUpdateStatus,
 } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 
@@ -74,6 +75,11 @@ interface NodesApi {
   setUnitName(network: string, unit: string, name: string): Promise<CommandResult>;
 }
 
+interface UpdatesApi {
+  check(): Promise<void>;
+  quitAndInstall(): Promise<void>;
+}
+
 interface CgateApi {
   connect(opts: ConnectOptions): Promise<void>;
   disconnect(): Promise<void>;
@@ -85,6 +91,7 @@ interface CgateApi {
   onTreeChanged(cb: (c: TreeChange) => void): () => void;
   onMeasurement(cb: (m: MeasurementState) => void): () => void;
   onActivity(cb: (a: ActivityEntry) => void): () => void;
+  onUpdate?(cb: (s: AppUpdateStatus) => void): () => void;
   sites: SitesApi;
   control: ControlApi;
   labels: LabelsApi;
@@ -92,6 +99,7 @@ interface CgateApi {
   net: NetApi;
   activity: ActivityApi;
   nodes: NodesApi;
+  updates?: UpdatesApi;
 }
 
 declare global {

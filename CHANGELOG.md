@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+* **dist:** sign and notarize installers when GitHub Actions secrets are set; unsigned fallback otherwise (M11)
+* **dist:** in-app auto-update from GitHub Releases (`electron-updater`); Help → Check for Updates
+* **dist:** Linux x64 AppImage on the Release workflow
+
+### Documentation
+
+* M11 distribution spec/plan, code-signing secrets guide, hardware lab status vs CI
+
 ## [1.3.0](https://github.com/dougrathbone/cgate-studio/compare/v1.2.0...v1.3.0) (2026-08-27)
 
 ### Features

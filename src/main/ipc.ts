@@ -5,6 +5,7 @@ import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
 import { exportLabelsToFile } from './projectExport';
 import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange, MeasurementState, ActivityEntry } from '../shared/types';
+import type { AutoUpdateHandle } from './autoUpdate';
 
 export const CHANNELS = {
   connect: 'cgate:connect',
@@ -50,6 +51,9 @@ export const CHANNELS = {
   trigger: 'cgate:trigger',           // main -> renderer push (trigger activity)
   treeChanged: 'cgate:treeChanged',   // main -> renderer push (742 reconcile)
   measurement: 'cgate:measurement',   // main -> renderer push (sensor readings)
+  updateStatus: 'app:updateStatus', // main -> renderer push (auto-update)
+  updateCheck: 'app:updateCheck',
+  updateInstall: 'app:updateInstall',
 } as const;
 
 const openDialogOptions = {
@@ -75,6 +79,7 @@ export function registerIpc(
   getWindow: () => BrowserWindow | null,
   siteStore: SiteStore,
   labelStore: LabelStore,
+  updates?: AutoUpdateHandle | null,
 ): CgateService {
   const svc = new CgateService();
 
@@ -159,6 +164,11 @@ export function registerIpc(
     const file = result.filePath;
     if (result.canceled || !file) return null;
     return exportLabelsToFile(file, input);
+  });
+
+  ipcMain.handle(CHANNELS.updateCheck, () => updates?.check());
+  ipcMain.handle(CHANNELS.updateInstall, () => {
+    updates?.quitAndInstall();
   });
 
   return svc;

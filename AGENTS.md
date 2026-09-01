@@ -33,6 +33,7 @@ Open-source community tool. **Not** a Toolkit clone — no unit programming.
 - **M2** Commission/Test: switch / ramp / terminate-ramp (transient, no DB writes).
 - **M3** Organize: rename labels + `PROJECT SAVE` (gated, confirm-on-save).
 - **M4–M10** shipped on the Approach A roadmap (scenes, sensors, session, health, commission UI, tag DB, diagnostics). Unit programming remains out of scope.
+- **M11** Distribution: optional code signing + notarization in CI, GitHub auto-update, Linux AppImage. See `docs/context/code-signing.md`.
 
 ## Conventions
 

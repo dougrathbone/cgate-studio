@@ -17,6 +17,7 @@ import type {
   MeasurementState,
   CgateNetworkInfo,
   ActivityEntry,
+  AppUpdateStatus,
 } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
 import type { CgateObjectParams } from '../shared/types';
@@ -65,6 +66,9 @@ const CH = {
   trigger: 'cgate:trigger',
   treeChanged: 'cgate:treeChanged',
   measurement: 'cgate:measurement',
+  updateStatus: 'app:updateStatus',
+  updateCheck: 'app:updateCheck',
+  updateInstall: 'app:updateInstall',
 };
 
 contextBridge.exposeInMainWorld('cgate', {
@@ -101,6 +105,15 @@ contextBridge.exposeInMainWorld('cgate', {
     const h = (_e: unknown, a: ActivityEntry) => cb(a);
     ipcRenderer.on(CH.activity, h);
     return () => ipcRenderer.removeListener(CH.activity, h);
+  },
+  onUpdate: (cb: (s: AppUpdateStatus) => void) => {
+    const h = (_e: unknown, s: AppUpdateStatus) => cb(s);
+    ipcRenderer.on(CH.updateStatus, h);
+    return () => ipcRenderer.removeListener(CH.updateStatus, h);
+  },
+  updates: {
+    check: (): Promise<void> => ipcRenderer.invoke(CH.updateCheck),
+    quitAndInstall: (): Promise<void> => ipcRenderer.invoke(CH.updateInstall),
   },
   sites: {
     list: (): Promise<Site[]> => ipcRenderer.invoke(CH.sitesList),

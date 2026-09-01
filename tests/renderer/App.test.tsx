@@ -39,6 +39,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
   let statusCb: (s: any) => void = () => {};
   let stateCb: (s: any) => void = () => {};
   let triggerCb: (s: any) => void = () => {};
+  let updateCb: (s: any) => void = () => {};
   let persistedGlobal: LabelImport | null = null;
   const persistedBySite: Record<string, LabelImport> = {};
   const api = {
@@ -64,6 +65,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     onMeasurement: jest.fn((cb: any) => { return jest.fn(); }),
     onTreeChanged: jest.fn(() => jest.fn()),
     onActivity: jest.fn(() => jest.fn()),
+    onUpdate: jest.fn((cb: any) => { updateCb = cb; return jest.fn(); }),
     sites: {
       list: jest.fn().mockResolvedValue(initialSites),
       add: jest.fn(),
@@ -110,6 +112,10 @@ function installApi(initialSites: Site[] = [homeSite]) {
       }),
     },
     activity: { list: jest.fn().mockResolvedValue([]) },
+    updates: {
+      check: jest.fn().mockResolvedValue(undefined),
+      quitAndInstall: jest.fn().mockResolvedValue(undefined),
+    },
     nodes: {
       getGroupDetail: jest.fn().mockResolvedValue({ label: null, level: null }),
       getNetworkLevels: jest.fn().mockResolvedValue({}),
@@ -126,7 +132,7 @@ function installApi(initialSites: Site[] = [homeSite]) {
     },
   };
   (window as any).cgate = api;
-  return { api, fireStatus: (s: any) => statusCb(s), fireState: (s: any) => stateCb(s), fireTrigger: (s: any) => triggerCb(s) };
+  return { api, fireStatus: (s: any) => statusCb(s), fireState: (s: any) => stateCb(s), fireTrigger: (s: any) => triggerCb(s), fireUpdate: (s: any) => updateCb(s) };
 }
 
 describe('App', () => {
@@ -460,6 +466,7 @@ describe('App', () => {
     const offMeasurement = jest.fn();
     const offTreeChanged = jest.fn();
     const offActivity = jest.fn();
+    const offUpdate = jest.fn();
     (window as any).cgate = {
       connect: jest.fn(),
       disconnect: jest.fn(),
@@ -471,6 +478,7 @@ describe('App', () => {
       onMeasurement: jest.fn(() => offMeasurement),
       onTreeChanged: jest.fn(() => offTreeChanged),
       onActivity: jest.fn(() => offActivity),
+      onUpdate: jest.fn(() => offUpdate),
       project: {
         name: jest.fn().mockResolvedValue('TESTPROJ'),
         dir: jest.fn().mockResolvedValue([]),
@@ -501,6 +509,7 @@ describe('App', () => {
     expect(offMeasurement).toHaveBeenCalled();
     expect(offTreeChanged).toHaveBeenCalled();
     expect(offActivity).toHaveBeenCalled();
+    expect(offUpdate).toHaveBeenCalled();
   });
 
   it('switches to Commission views, opens status, and shows last-fired trigger', async () => {
@@ -522,5 +531,15 @@ describe('App', () => {
       actionSelector: 4,
     }));
     expect(await screen.findByText(/Fired 254\/202\/1/)).toBeInTheDocument();
+  });
+
+  it('shows a restart banner when an update is ready', async () => {
+    const { api, fireUpdate } = installApi();
+    render(<App />);
+    await screen.findByText('Home');
+    act(() => fireUpdate({ state: 'ready', version: '1.4.0' }));
+    expect(await screen.findByText(/1\.4\.0 is ready to install/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Restart to update/i }));
+    expect(api.updates.quitAndInstall).toHaveBeenCalled();
   });
 });

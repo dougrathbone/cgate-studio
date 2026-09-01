@@ -55,31 +55,37 @@ describe('preload bridge', () => {
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:state', expect.any(Function));
   });
 
-  it('subscribes to trigger, treeChanged, measurement, and activity events', () => {
+  it('subscribes to trigger, treeChanged, measurement, activity, and update events', () => {
     const trigger = jest.fn();
     const tree = jest.fn();
     const measurement = jest.fn();
     const activity = jest.fn();
+    const update = jest.fn();
     const offT = api.onTrigger(trigger);
     const offC = api.onTreeChanged(tree);
     const offM = api.onMeasurement(measurement);
     const offA = api.onActivity(activity);
+    const offU = api.onUpdate(update);
     listeners['cgate:trigger']({}, { address: '254/202/1' });
     listeners['cgate:treeChanged']({}, { network: '254' });
     listeners['cgate:measurement']({}, { address: '254/228/1', value: 21 });
     listeners['cgate:activity']({}, { command: 'ON' });
+    listeners['app:updateStatus']({}, { state: 'ready', version: '1.4.0' });
     expect(trigger).toHaveBeenCalled();
     expect(tree).toHaveBeenCalled();
     expect(measurement).toHaveBeenCalled();
     expect(activity).toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({ state: 'ready', version: '1.4.0' });
     offT();
     offC();
     offM();
     offA();
+    offU();
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:trigger', expect.any(Function));
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:treeChanged', expect.any(Function));
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:measurement', expect.any(Function));
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith('cgate:activity', expect.any(Function));
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith('app:updateStatus', expect.any(Function));
   });
 
   it('exposes a sites API mapped to the sites IPC channels', async () => {
@@ -127,6 +133,8 @@ describe('preload bridge', () => {
     await api.nodes.getUnitParams('254', '10');
     await api.nodes.setGroupParam(ref, 'RampTime', '6');
     await api.nodes.setUnitName('254', '10', 'Hall');
+    await api.updates.check();
+    await api.updates.quitAndInstall();
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:setLevel', ref, 128, 4);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:terminateRamp', ref);
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('control:fireScene', ref, 4);
@@ -154,5 +162,7 @@ describe('preload bridge', () => {
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:unitParams', '254', '10');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:setGroupParam', ref, 'RampTime', '6');
     expect(ipcRenderer.invoke).toHaveBeenCalledWith('nodes:setUnitName', '254', '10', 'Hall');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('app:updateCheck');
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith('app:updateInstall');
   });
 });

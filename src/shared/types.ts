@@ -208,3 +208,21 @@ export type TreeSelection =
 
 /** Parameters returned by `GET //…/path *` on the C-Gate command channel. */
 export type CgateObjectParams = Record<string, string>;
+
+/** Auto-update progress pushed from the main process (packaged builds only). */
+export type AppUpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'not-available'
+  | 'error'
+  | 'dev';
+
+export interface AppUpdateStatus {
+  state: AppUpdateState;
+  version?: string;
+  percent?: number;
+  message?: string;
+}
