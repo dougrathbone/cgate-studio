@@ -90,11 +90,19 @@ export function showAbout(parent?: BrowserWindow | null): void {
   });
 }
 
-function helpSubmenu(getWindow: () => BrowserWindow | null): MenuItemConstructorOptions[] {
+function helpSubmenu(
+  getWindow: () => BrowserWindow | null,
+  onCheckForUpdates?: () => void,
+): MenuItemConstructorOptions[] {
   return [
     {
       label: `About ${APP_NAME}`,
       click: () => showAbout(getWindow()),
+    },
+    { type: 'separator' },
+    {
+      label: 'Check for Updates…',
+      click: () => onCheckForUpdates?.(),
     },
     { type: 'separator' },
     {
@@ -109,11 +117,18 @@ function helpSubmenu(getWindow: () => BrowserWindow | null): MenuItemConstructor
 }
 
 /** macOS application menu with About, GitHub, and license entries. */
-function macAppMenu(getWindow: () => BrowserWindow | null): MenuItemConstructorOptions {
+function macAppMenu(
+  getWindow: () => BrowserWindow | null,
+  onCheckForUpdates?: () => void,
+): MenuItemConstructorOptions {
   return {
     label: APP_NAME,
     submenu: [
       { role: 'about' },
+      {
+        label: 'Check for Updates…',
+        click: () => onCheckForUpdates?.(),
+      },
       { type: 'separator' },
       { label: 'View on GitHub', click: () => openGitHubRepo() },
       { label: 'License…', click: () => showLicenseDialog(getWindow()) },
@@ -131,10 +146,12 @@ function macAppMenu(getWindow: () => BrowserWindow | null): MenuItemConstructorO
 
 export function buildAppMenuTemplate(
   getWindow: () => BrowserWindow | null,
+  updateActions?: { onCheckForUpdates?: () => void },
 ): MenuItemConstructorOptions[] {
   const isMac = process.platform === 'darwin';
+  const onCheckForUpdates = updateActions?.onCheckForUpdates;
   return [
-    ...(isMac ? [macAppMenu(getWindow)] : []),
+    ...(isMac ? [macAppMenu(getWindow, onCheckForUpdates)] : []),
     { role: 'fileMenu' },
     { role: 'editMenu' },
     { role: 'viewMenu' },
@@ -142,7 +159,7 @@ export function buildAppMenuTemplate(
     {
       label: 'Help',
       role: !isMac ? 'help' as const : undefined,
-      submenu: helpSubmenu(getWindow),
+      submenu: helpSubmenu(getWindow, onCheckForUpdates),
     },
   ];
 }

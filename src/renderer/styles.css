@@ -397,6 +397,10 @@ body {
 .banner__spacer {
   flex: 1;
 }
+.banner--update {
+  background: color-mix(in srgb, var(--on) 14%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--on) 35%, transparent);
+}
 
 /* ---- Body / sidebar / main ------------------------------------------- */
 

@@ -11,6 +11,7 @@ import { ActivityDrawer } from './components/ActivityDrawer';
 import { ModeToggle } from './components/ModeToggle';
 import { InventoryTable } from './components/InventoryTable';
 import { GroupsWorkspace } from './components/GroupsWorkspace';
+import { UpdateBanner } from './components/UpdateBanner';
 import type { GroupActions } from './components/GroupRow';
 import type {
   ConnectionStatus,
@@ -26,6 +27,7 @@ import type {
   CgateNetworkInfo,
   ActivityEntry,
   UiMode,
+  AppUpdateStatus,
 } from '../shared/types';
 import { CONNECTION_SUPERSEDED } from '../shared/types';
 import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus';
@@ -146,6 +148,7 @@ export function App() {
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
 
   const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastTrigger, setLastTrigger] = useState<TriggerActivity | null>(null);
@@ -310,6 +313,7 @@ export function App() {
         }).catch(() => {});
       }, 500);
     });
+    const offUpdate = cgate().onUpdate?.(setUpdateStatus) ?? (() => {});
     return () => {
       offStatus();
       offState();
@@ -317,6 +321,7 @@ export function App() {
       offMeasurement();
       offActivity();
       offTreeChanged();
+      offUpdate();
       if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
     };
   }, []);
@@ -717,6 +722,12 @@ export function App() {
           </button>
         </div>
       )}
+
+      <UpdateBanner
+        status={updateStatus}
+        onRestart={() => { void cgate().updates?.quitAndInstall(); }}
+        onDismiss={() => setUpdateStatus(null)}
+      />
 
       {status === 'connected' && (
         <StatusBar

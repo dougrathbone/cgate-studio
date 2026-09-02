@@ -120,18 +120,21 @@ describe('about', () => {
     expect(showMessageBox).toHaveBeenCalledWith(parent, expect.objectContaining({ title: 'License' }));
   });
 
-  it('buildAppMenuTemplate includes a Help submenu with working clicks', () => {
+  it('buildAppMenuTemplate on Windows includes a Help submenu with working clicks', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
     const win = { id: 9 } as any;
-    const template = buildAppMenuTemplate(() => win);
+    const onCheckForUpdates = jest.fn();
+    const template = buildAppMenuTemplate(() => win, { onCheckForUpdates });
     const help = template.find((item) => item.label === 'Help');
     expect(help).toBeDefined();
     const submenu = help!.submenu as Array<{ label?: string; click?: () => void; type?: string }>;
     submenu.find((i) => i.label === `About ${APP_NAME}`)?.click?.();
     submenu.find((i) => i.label === 'View on GitHub')?.click?.();
     submenu.find((i) => i.label === 'License…')?.click?.();
+    submenu.find((i) => i.label === 'Check for Updates…')?.click?.();
     expect(showMessageBox).toHaveBeenCalled();
     expect(openExternal).toHaveBeenCalled();
+    expect(onCheckForUpdates).toHaveBeenCalled();
   });
 
   it('buildAppMenuTemplate on macOS prepends the app menu', () => {

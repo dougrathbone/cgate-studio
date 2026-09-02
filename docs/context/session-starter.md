@@ -34,7 +34,7 @@ Full design: [`../specs/2026-05-30-cbus-studio-design.md`](../specs/2026-05-30-c
 6. **M6 — Session & project:** disconnect, site edit/LOGIN, project + network pickers (Approach A). See `docs/superpowers/specs/2026-07-11-cgate-frontend-parity-design.md`.
 7. **M7 — Network health:** NET OPEN/CLOSE/SYNC, status bar, FORCE, activity drawer.
 
-**Approach A roadmap (approved):** M8 Commission UI → M9 tag DB authoring → M10 diagnostics (done). Unit programming remains out of scope.
+**Approach A roadmap (approved):** M8 Commission UI → M9 tag DB authoring → M10 diagnostics (done). **M11** is distribution (signing, notarization, auto-update, Linux AppImage). Unit programming remains out of scope.
 
 ## Architecture (one-liner)
 
@@ -47,6 +47,8 @@ context-isolated IPC bridge and never opens sockets.
 - Spec: `docs/specs/2026-05-30-cbus-studio-design.md`
 - Plan: `docs/plans/` (implementation plan)
 - C-Gate client: [`vendoring-cgate-client.md`](vendoring-cgate-client.md) (git dependency on `cgateweb/cgate-client`)
+- Code signing / auto-update: [`code-signing.md`](code-signing.md)
+- Hardware vs CI: [`../smoke-lab-status.md`](../smoke-lab-status.md)
 - Source `cgateweb` repo: https://github.com/dougrathbone/cgateweb
 
 ## First implementation steps (once planning is done)

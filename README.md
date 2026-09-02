@@ -23,14 +23,18 @@ attempt Toolkit's proprietary unit-programming layer.
 
 ## Download
 
-Pre-built installers for **macOS** (`.dmg`) and **Windows** (`.exe`) are attached
-to each [GitHub Release](../../releases/latest). Grab the latest one, install, and
-point it at your C-Gate server.
+Pre-built installers for **macOS** (`.dmg`), **Windows** (`.exe`), and **Linux**
+(`.AppImage`) are attached to each [GitHub Release](../../releases/latest). Grab
+the latest one, install, and point it at your C-Gate server.
 
-Builds are currently **unsigned** (no Apple Developer / Windows code-signing
-certificate yet), so the OS will show the usual unidentified-developer warning on
-first launch — on macOS, right-click the app and choose **Open**; on Windows,
-choose **More info → Run anyway**.
+When Apple Developer ID and Windows Authenticode secrets are configured in CI,
+those installers are **signed** (macOS is notarized). If a platform secret is
+missing, that build is still published **unsigned** — on macOS, right-click
+the app and choose **Open**; on Windows, choose **More info → Run anyway**. See
+[`docs/context/code-signing.md`](docs/context/code-signing.md).
+
+Installed copies check GitHub Releases for updates (**Help → Check for Updates…**).
+When a new version is downloaded, a banner offers **Restart to update**.
 
 ## Why
 
@@ -144,6 +148,12 @@ its documented interface." CBus Studio is that front-end.
 - **CSV** export of group tags alongside XML/CBZ.
 - Keyboard: **`/`** focuses the visible filter; **Escape** clears it.
 
+### Updates (M11)
+
+- Packaged builds check **GitHub Releases** for a newer version and download it in
+  the background. A banner offers **Restart to update**. Development runs skip
+  the check (the menu item explains why).
+
 ### Reliability
 
 - Command-channel access is **serialized**, so a tree refresh can't interleave
@@ -209,7 +219,9 @@ in-process mock C-Gate). CI enforces a global **80% coverage** floor.
 `npm run dev` opens the app window; add a **site** (name + C-Gate host + ports)
 and click **Connect** to browse, operate, and rename items on the network. A
 manual hardware-verification checklist lives in
-[`docs/smoke-checklist-m1.md`](docs/smoke-checklist-m1.md).
+[`docs/smoke-checklist-m1.md`](docs/smoke-checklist-m1.md). What CI vs a live CNI
+has already proven is summarised in
+[`docs/smoke-lab-status.md`](docs/smoke-lab-status.md).
 
 > **Note on `PROJECT SAVE`:** rename + save writes to your live C-Gate project
 > database. Verify the behaviour against a throwaway group before relying on it in
@@ -223,12 +235,14 @@ manual hardware-verification checklist lives in
 ```bash
 npm run dist:mac   # macOS universal .dmg + .zip (built on macOS)
 npm run dist:win   # Windows x64 NSIS .exe installer (built on Windows)
+npm run dist:linux # Linux x64 AppImage (built on Linux)
 npm run dist       # installer(s) for the current host platform
 ```
 
 Each platform's installer must be built on that platform — the **Release**
-GitHub Actions workflow does this on macOS and Windows runners and attaches the
-results to the GitHub Release for a tag (see *Versioning & releases* below).
+GitHub Actions workflow does this on macOS, Windows, and Linux runners and
+attaches the results to the GitHub Release for a tag (see *Versioning &
+releases* below).
 
 ## Versioning & releases
 
@@ -243,13 +257,20 @@ Releases follow [Semantic Versioning](https://semver.org/) and are cut
    git push origin v1.3.0
    ```
 3. Pushing a `v*` tag triggers the **Release** workflow, which builds **macOS**
-   (`.dmg` + `.zip`, universal Apple Silicon + Intel) and **Windows** (`.exe`
-   NSIS) installers on native runners and publishes a **GitHub Release** for the
-   tag with the installers attached.
+   (`.dmg` + `.zip`, universal Apple Silicon + Intel), **Windows** (`.exe`
+   NSIS), and **Linux** (`.AppImage`) on native runners and publishes a **GitHub
+   Release** for the tag with the installers plus `electron-updater` metadata
+   (`latest.yml` / `latest-mac.yml` / `latest-linux.yml`).
+
+Signing uses GitHub Actions secrets (`MACOS_CSC_LINK`, `WIN_CSC_LINK`, Apple
+notary credentials). Missing secrets produce an unsigned artifact for that
+platform instead of failing the job. See
+[`docs/context/code-signing.md`](docs/context/code-signing.md).
 
 To (re)build installers for an existing tag, run the workflow manually
 (**Actions → Release → Run workflow**) and supply the tag. The workflow uses the
-built-in `GITHUB_TOKEN`, so there are no extra secrets to configure.
+built-in `GITHUB_TOKEN` to publish the release. Signing certificates are optional
+extra secrets (see above).
 
 ## Architecture
 

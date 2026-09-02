@@ -116,13 +116,14 @@ function lastHandler(channel: string): Function {
 describe('registerIpc', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('registers cgate and sites handlers', () => {
+  it('registers cgate, sites, and update handlers', () => {
     registerIpc(() => null, fakeStore(), fakeLabelStore());
     const channels = handleMock.mock.calls.map((c) => c[0]);
     expect(channels).toEqual(
       expect.arrayContaining([
         CHANNELS.connect, CHANNELS.disconnect, CHANNELS.getTree,
         CHANNELS.sitesList, CHANNELS.sitesAdd, CHANNELS.sitesUpdate, CHANNELS.sitesRemove,
+        CHANNELS.updateCheck, CHANNELS.updateInstall,
       ]),
     );
   });
@@ -304,5 +305,14 @@ describe('registerIpc', () => {
     expect(await lastHandler(CHANNELS.sitesLabelsGet)({}, 'site-1')).toBe(imp);
     await lastHandler(CHANNELS.sitesLabelsSave)({}, 'site-1', imp);
     expect(labels.save).toHaveBeenCalledWith('site-1', imp);
+  });
+
+  it('registers update check and install handlers', async () => {
+    const updates = { check: jest.fn().mockResolvedValue(undefined), quitAndInstall: jest.fn() };
+    registerIpc(() => null, fakeStore(), fakeLabelStore(), updates);
+    await lastHandler(CHANNELS.updateCheck)({});
+    await lastHandler(CHANNELS.updateInstall)({});
+    expect(updates.check).toHaveBeenCalled();
+    expect(updates.quitAndInstall).toHaveBeenCalled();
   });
 });
