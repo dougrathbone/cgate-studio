@@ -3,6 +3,7 @@ import { cgate } from '../api';
 import { CloseButton } from './CloseButton';
 import type { GroupActions } from './GroupRow';
 import type { GroupNode, GroupState, TreeSelection, CgateObjectParams, UnitNode } from '../../shared/types';
+import { formatUnitType } from '../../shared/displayLabels';
 
 const refOf = (g: GroupNode) => ({ network: g.network, application: g.application, group: g.group });
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -134,7 +135,7 @@ function unitSummaryCards(params: CgateObjectParams, unit: UnitNode): { label: s
     { label: 'Catalog', value: get('CatalogNumber') },
     { label: 'Serial', value: get('Serial') || unit.serial || '' },
     { label: 'Firmware', value: get('Firmware', 'Version') || unit.firmware || '' },
-    { label: 'Type', value: get('Type', 'PartName') || unit.type || '' },
+    { label: 'Type', value: formatUnitType(get('Type', 'PartName') || unit.type || '', unit.category) },
   ];
 }
 

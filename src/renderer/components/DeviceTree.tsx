@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { Tree, NetworkNode, AppNode, GroupNode, UnitNode, GroupState, TreeSelection, MeasurementState } from '../../shared/types';
+import { formatMeasurementValue, formatUnitType } from '../../shared/displayLabels';
 import { GroupRow, GroupActions } from './GroupRow';
 import { useFilterHotkeys, useFilterRef } from '../hooks/useFilterHotkeys';
 
@@ -142,10 +143,20 @@ export function DeviceTree({
         ref={filterRef}
         className="filter"
         aria-label="Filter"
-        placeholder={`Filter ${totalUnits} devices, applications, groups\u2026`}
+        placeholder={`Filter ${totalUnits} devices, applications, groups… (/ to focus)`}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />
+      {filtering &&
+        tree.every((net) => {
+          const units = (net.units ?? []).filter((u) => unitMatches(u, q));
+          const apps = (net.applications ?? []).filter((a) => appMatches(a, q));
+          return units.length === 0 && apps.length === 0;
+        }) && (
+          <p className="tree__noMatches" role="status">
+            No matches.
+          </p>
+        )}
       {tree.map((net) => (
         <NetworkBlock
           key={net.address}
@@ -281,12 +292,15 @@ function NetworkBlock({
                       <strong>{u.address}</strong>
                     </span>
                     <span style={{ flex: 1, minWidth: 0 }}>{u.name ?? <span className="muted">(unnamed)</span>}</span>
-                    {u.category && <span className="tag">{u.category}</span>}
-                    {u.type && <span className="muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{u.type}</span>}
+                    {u.type && (
+                      <span className="muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {formatUnitType(u.type, u.category)}
+                      </span>
+                    )}
                   </Row>
                   {uOpen && (
                     <div style={{ paddingLeft: 8 + 3 * INDENT, paddingBottom: 6 }}>
-                      <UnitDetail label="Type" value={u.type} />
+                      <UnitDetail label="Type" value={u.type ? formatUnitType(u.type, u.category) : null} />
                       <UnitDetail label="Firmware" value={u.firmware} />
                       <UnitDetail label="Serial" value={u.serial} />
                       <UnitDetail label="Applications" value={u.applications.join(', ') || null} />
@@ -310,7 +324,7 @@ function NetworkBlock({
                     <Row key={m.address} depth={2}>
                       <span className="row__addr"><strong>{m.address}</strong></span>
                       <span style={{ marginLeft: 'auto' }}>
-                        {m.value}{m.units ? ` (units ${m.units})` : ''}
+                        {formatMeasurementValue(m.value, m.units)}
                       </span>
                     </Row>
                   ))}

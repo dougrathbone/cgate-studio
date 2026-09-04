@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Features
+
+* **dist:** `npm run verify-release` checks GitHub installer assets and updater YAML (M12)
+* **ui:** human-readable unit types and measurement units; clearer filter empty states (M13)
+
 ## [1.3.2](https://github.com/dougrathbone/cgate-studio/compare/v1.3.1...v1.3.2) (2026-09-04)
 
 ### Features

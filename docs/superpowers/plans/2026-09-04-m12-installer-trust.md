@@ -69,10 +69,10 @@ export function parseSigningStatus(releaseBody) {
 }
 ```
 
-- [ ] Write failing tests for `tagToVersion`, `requiredAssetPatterns` match on real 1.3.2 names, `parseUpdaterVersion`, `parseSigningStatus`
-- [ ] Implement helpers
-- [ ] `npm test -- --testPathPattern=verify-release` green
-- [ ] Commit: `test: add release verify helpers for M12`
+- [x] Write failing tests for `tagToVersion`, `requiredAssetPatterns` match on real 1.3.2 names, `parseUpdaterVersion`, `parseSigningStatus`
+- [x] Implement helpers
+- [x] `npm test -- --testPathPattern=verify-release` green
+- [x] Commit: `test: add release verify helpers for M12`
 
 ---
 

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { Tree, UnitNode, TreeSelection } from '../../shared/types';
+import { formatUnitType } from '../../shared/displayLabels';
 import { useFilterHotkeys, useFilterRef } from '../hooks/useFilterHotkeys';
 
 function collectUnits(tree: Tree): { network: string; unit: UnitNode }[] {
@@ -48,14 +49,14 @@ export function InventoryTable({
           ref={filterRef}
           className="filter"
           type="search"
-          placeholder={`Filter ${rows.length} units…`}
+          placeholder={`Filter ${rows.length} units… (/ to focus)`}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           aria-label="Filter units"
         />
       </div>
       {rows.length === 0 ? (
-        <p className="commTable__empty">No units to show.</p>
+        <p className="commTable__empty">{filter.trim() ? 'No matches.' : 'No units to show.'}</p>
       ) : (
         <div className="commTable__scroll">
           <table className="commTable__table">
@@ -87,7 +88,7 @@ export function InventoryTable({
                   >
                     <td className="commTable__mono">{unit.address}</td>
                     <td>{unit.name ?? '—'}</td>
-                    <td className="commTable__mono">{unit.type ?? '—'}</td>
+                    <td className="commTable__mono">{formatUnitType(unit.type, unit.category)}</td>
                     <td className="commTable__mono">{unit.firmware ?? '—'}</td>
                     <td className="commTable__mono">{unit.serial ?? '—'}</td>
                   </tr>

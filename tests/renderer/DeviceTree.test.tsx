@@ -79,7 +79,7 @@ describe('DeviceTree', () => {
     // Physical units listed with friendly category.
     expect(screen.getByText('RELAY3')).toBeInTheDocument();
     expect(screen.getByText('SAVANT')).toBeInTheDocument();
-    expect(screen.getByText('Relay')).toBeInTheDocument();
+    expect(screen.getByText('Relay (RELDN12)')).toBeInTheDocument();
   });
 
   it('shows the project name next to the network to identify it', () => {

@@ -46,7 +46,7 @@ describe('InventoryTable', () => {
   it('filters units by query', () => {
     render(<InventoryTable tree={tree} />);
     fireEvent.change(screen.getByLabelText('Filter units'), { target: { value: 'relay' } });
-    expect(screen.getByText('No units to show.')).toBeInTheDocument();
+    expect(screen.getByText('No matches.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Filter units'), { target: { value: 'dim' } });
     expect(screen.getByText('DIM2')).toBeInTheDocument();
   });
