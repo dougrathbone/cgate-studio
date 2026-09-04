@@ -10,6 +10,7 @@
     "start": "electron-vite preview",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "verify-release": "node scripts/verify-release.js",
     "dist": "npm run build && electron-builder --publish never",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",

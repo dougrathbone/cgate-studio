@@ -42,6 +42,7 @@ M1–M10 behaviours that the Jest suite already exercises: connect/tree, on/off/
 | Signed / notarized macOS | **Blocked** — `MACOS_CSC_LINK` (and Apple notary secrets) not configured |
 | Authenticode Windows | **Blocked** — `WIN_CSC_LINK` not configured |
 | Auto-update metadata | **Proven** — `latest-mac.yml` / `latest.yml` / `latest-linux.yml` for 1.3.2 |
+| `npm run verify-release -- v1.3.2` | **Proven** (M12) — assets + updater YAML; signing status warns `unsigned` |
 | Auto-update N→N+1 desk path | Still on-site (install older build, launch after newer tag) |
 
 See `docs/smoke-checklist-m11.md` and `docs/context/code-signing.md`.

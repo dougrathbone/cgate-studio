@@ -13,12 +13,16 @@ Proven on **v1.3.2** (2026-09-04) — Release workflow logs showed `MACOS_CSC_LI
 
 ## Signed macOS (secrets present)
 
+After secrets are configured, rebuild the tag (`gh workflow run release.yml -f tag=vX.Y.Z`), then:
+
+- [ ] `npm run verify-release -- vX.Y.Z --check-codesign` passes (signing status `signed` for macOS)
 - [ ] `codesign -dv --verbose=4` on the `.app` inside the `.dmg` shows Developer ID
-- [ ] `spctl --assess --type install` / first launch on a clean Mac does **not** require right-click Open
+- [ ] `spctl --assess --type execute` / first launch on a clean Mac does **not** require right-click Open
 - [ ] Notary history shows the build Accepted
 
 ## Signed Windows
 
+- [ ] `npm run verify-release -- vX.Y.Z` reports Windows **signed**
 - [ ] Properties → Digital Signatures on the NSIS `.exe` shows the Authenticode cert
 - [ ] SmartScreen is absent or reduced vs the unsigned 1.3.0 exe (EV still best)
 
