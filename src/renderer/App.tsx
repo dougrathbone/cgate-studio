@@ -148,6 +148,8 @@ export function App() {
   const [serverStatusLoading, setServerStatusLoading] = useState(false);
   const [selection, setSelection] = useState<TreeSelection | null>(null);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
+  /** null = auto: open when no sites yet, collapsed otherwise */
+  const [addSiteOpen, setAddSiteOpen] = useState<boolean | null>(null);
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
 
   const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -811,7 +813,28 @@ export function App() {
               onCancel={() => setEditingSite(null)}
             />
           ) : (
-            <SiteForm mode="add" onAdd={addSite} />
+            <div className="sidebar__add">
+              <button
+                type="button"
+                className="sidebar__addToggle"
+                aria-expanded={addSiteOpen ?? sites.length === 0}
+                onClick={() => setAddSiteOpen((v) => !(v ?? sites.length === 0))}
+              >
+                <span className="sidebar__addCaret" aria-hidden>
+                  {(addSiteOpen ?? sites.length === 0) ? '\u25BE' : '\u25B8'}
+                </span>
+                Add a site
+              </button>
+              {(addSiteOpen ?? sites.length === 0) && (
+                <SiteForm
+                  mode="add"
+                  onAdd={(input) => {
+                    void addSite(input);
+                    setAddSiteOpen(false);
+                  }}
+                />
+              )}
+            </div>
           )}
         </aside>
         <main className={`main${selection ? ' main--split' : ''}${activityOpen ? ' main--activity' : ''}`}>

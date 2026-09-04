@@ -547,6 +547,43 @@ body {
   text-overflow: ellipsis;
 }
 
+.sidebar__add {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.sidebar__addToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  padding: var(--s3) var(--s4);
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar__addToggle:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.sidebar__addCaret {
+  display: inline-block;
+  width: 0.9em;
+  color: var(--text-3);
+}
+.sidebar__add .siteForm {
+  border-top: 1px solid var(--border);
+}
+.sidebar__add .siteForm__title {
+  display: none;
+}
+
 /* ---- Site form ------------------------------------------------------- */
 
 .siteForm {

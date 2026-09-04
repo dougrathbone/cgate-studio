@@ -177,10 +177,13 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('Home');
 
+    // Form stays collapsed when sites already exist.
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Add a site/i }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Office' } });
     fireEvent.change(screen.getByLabelText('Host'), { target: { value: '10.0.0.2' } });
     await act(async () => {
-      fireEvent.click(screen.getByText('Add site'));
+      fireEvent.click(screen.getByRole('button', { name: 'Add site' }));
     });
 
     expect(api.sites.add).toHaveBeenCalledWith({
