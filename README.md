@@ -132,6 +132,7 @@ its documented interface." CBus Studio is that front-end.
 - Dual mode: **Operate** (homeowner tree + controls) and **Commission**
   (inventory, filterable Groups workspace, scan/refresh, bulk on/off/level).
 - Richer unit inspector — still no programming tabs.
+- **Export inventory** CSV of units (address, type label, serial, firmware, name).
 
 ### Tag DB (M9)
 

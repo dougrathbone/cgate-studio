@@ -3,7 +3,7 @@ import { CgateService } from './CgateService';
 import { SiteStore } from './SiteStore';
 import { LabelStore } from './LabelStore';
 import { importLabelsFromFile } from './projectImport';
-import { exportLabelsToFile } from './projectExport';
+import { exportLabelsToFile, exportInventoryToFile } from './projectExport';
 import type { ConnectOptions, Site, SiteInput, GroupRef, LabelImport, LabelExportInput, LabelExportResult, TriggerActivity, TreeChange, MeasurementState, ActivityEntry } from '../shared/types';
 import type { AutoUpdateHandle } from './autoUpdate';
 
@@ -39,6 +39,7 @@ export const CHANNELS = {
   activity: 'cgate:activity',           // main -> renderer push
   projectImport: 'project:import',      // import labels from a .cbz / .xml file
   projectExport: 'project:export',      // export labels to a .cbz / .xml file
+  inventoryExport: 'inventory:export',  // M14: unit inventory CSV
   nodeDetail: 'nodes:detail',           // lazy per-group label + level enrichment
   networkLevels: 'nodes:networkLevels', // bulk level hydration at connect
   identifyUnit: 'nodes:identifyUnit',   // M10: ID //net/p/unit
@@ -164,6 +165,25 @@ export function registerIpc(
     const file = result.filePath;
     if (result.canceled || !file) return null;
     return exportLabelsToFile(file, input);
+  });
+
+  ipcMain.handle(CHANNELS.inventoryExport, async (_e, input: LabelExportInput): Promise<LabelExportResult | null> => {
+    const win = getWindow();
+    const defaultPath = `${(input.projectName?.trim() || 'cbus-inventory').replace(/[^\w.-]+/g, '_')}-inventory.csv`;
+    const opts = {
+      title: 'Export unit inventory',
+      filters: [
+        { name: 'CSV inventory', extensions: ['csv'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+      defaultPath,
+    };
+    const result = win
+      ? await dialog.showSaveDialog(win, opts)
+      : await dialog.showSaveDialog(opts);
+    const file = result.filePath;
+    if (result.canceled || !file) return null;
+    return exportInventoryToFile(file, input);
   });
 
   ipcMain.handle(CHANNELS.updateCheck, () => updates?.check());

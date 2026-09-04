@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { exportLabelsToFile, exportLabelsFromTree, buildLabelExport, buildLabelsCsv } from '../src/main/projectExport';
+import { exportLabelsToFile, exportLabelsFromTree, buildLabelExport, buildLabelsCsv, buildInventoryCsv, exportInventoryToFile } from '../src/main/projectExport';
 import { importLabelsFromBuffer } from '../src/main/projectImport';
 const AdmZip = require('adm-zip');
 
@@ -88,6 +88,26 @@ describe('projectExport', () => {
     expect(csv).toContain('network,application,group,address,label');
     expect(csv).toContain('254,56,4,254/56/4,Kitchen');
     expect(stats).toEqual({ networkCount: 1, groupCount: 1, labelCount: 1, unitCount: 1 });
+  });
+
+  it('buildInventoryCsv returns unit identity columns', () => {
+    const { csv, stats } = buildInventoryCsv(tree);
+    expect(csv).toContain('network,address,type,typeLabel,serial,firmware,name');
+    expect(csv).toContain('254,2,DIMDC8,Dimmer (DIMDC8)');
+    expect(csv).toContain('DIMMER');
+    expect(stats.unitCount).toBe(1);
+  });
+
+  it('exportInventoryToFile writes CSV to disk', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cbus-inv-'));
+    const file = path.join(dir, 'inv.csv');
+    try {
+      const result = exportInventoryToFile(file, { tree, projectName: 'HOME' });
+      expect(result.path).toBe(file);
+      expect(fs.readFileSync(file, 'utf8')).toContain('typeLabel');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('exportLabelsToFile writes csv when extension is .csv', () => {

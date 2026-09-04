@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { LabelExportInput, LabelExportResult, Tree } from '../shared/types';
+import { formatUnitType } from '../shared/displayLabels';
 
 // ES import so electron-vite bundles the CommonJS exporter into main.
 import { exportLabelsXml } from '../cgate-client/cbusProjectExporter';
@@ -47,6 +48,39 @@ export function buildLabelsCsv(tree: Tree): { csv: string; stats: LabelExportRes
   };
 }
 
+/** Inventory report CSV (units) for Commission (M14). */
+export function buildInventoryCsv(tree: Tree): { csv: string; stats: LabelExportResult['stats'] } {
+  const rows: string[] = ['network,address,type,typeLabel,serial,firmware,name'];
+  let groupCount = 0;
+  let labelCount = 0;
+  let unitCount = 0;
+  for (const net of tree) {
+    for (const app of net.applications) {
+      groupCount += app.groups.length;
+      for (const g of app.groups) {
+        if (g.label) labelCount += 1;
+      }
+    }
+    for (const u of net.units ?? []) {
+      unitCount += 1;
+      const type = u.type ?? '';
+      rows.push([
+        csvEscape(net.address),
+        csvEscape(u.address),
+        csvEscape(type),
+        csvEscape(type ? formatUnitType(type, u.category) : ''),
+        csvEscape(u.serial ?? ''),
+        csvEscape(u.firmware ?? ''),
+        csvEscape(u.name ?? ''),
+      ].join(','));
+    }
+  }
+  return {
+    csv: rows.join('\n') + '\n',
+    stats: { networkCount: tree.length, groupCount, labelCount, unitCount },
+  };
+}
+
 function defaultBasename(projectName?: string | null): string {
   const base = (projectName?.trim() || 'cbus-labels').replace(/[^\w.-]+/g, '_');
   return base || 'cbus-labels';
@@ -75,6 +109,13 @@ export function exportLabelsToFile(filePath: string, input: LabelExportInput): L
     fs.writeFileSync(filePath, xml, 'utf8');
   }
 
+  return { path: filePath, stats };
+}
+
+/** Write unit inventory CSV (Commission report pack). */
+export function exportInventoryToFile(filePath: string, input: LabelExportInput): LabelExportResult {
+  const { csv, stats } = buildInventoryCsv(input.tree);
+  fs.writeFileSync(filePath, csv, 'utf8');
   return { path: filePath, stats };
 }
 

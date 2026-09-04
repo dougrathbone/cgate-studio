@@ -51,6 +51,7 @@ interface ProjectApi {
   use(name: string): Promise<CommandResult>;
   import(): Promise<LabelImport | null>;
   export(input: LabelExportInput): Promise<LabelExportResult | null>;
+  exportInventory(input: LabelExportInput): Promise<LabelExportResult | null>;
 }
 
 interface NetApi {

@@ -4,6 +4,7 @@ import { CloseButton } from './CloseButton';
 import type { GroupActions } from './GroupRow';
 import type { GroupNode, GroupState, TreeSelection, CgateObjectParams, UnitNode } from '../../shared/types';
 import { formatUnitType } from '../../shared/displayLabels';
+import { tagNameMismatch } from '../../shared/mismatch';
 
 const refOf = (g: GroupNode) => ({ network: g.network, application: g.application, group: g.group });
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -483,7 +484,7 @@ export function EntityPanel({
               {(() => {
                 const tag = (selection.group.label ?? '').trim();
                 const objectName = (params.Name ?? '').trim();
-                if (!tag || !objectName || tag === objectName) return null;
+                if (!tagNameMismatch(tag, objectName)) return null;
                 return (
                   <p className="entityPanel__hint" role="status">
                     TagName (“{tag}”) differs from object Name (“{objectName}”).

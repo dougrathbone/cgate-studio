@@ -257,6 +257,22 @@ export function App() {
     }
   }
 
+  async function exportInventory() {
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await cgate().project.exportInventory({ tree, projectName });
+      if (!result) return;
+      const { stats, path: savedPath } = result;
+      const base = savedPath.split(/[/\\]/).pop() ?? savedPath;
+      setNotice(
+        `Exported inventory of ${stats.unitCount} unit${stats.unitCount === 1 ? '' : 's'} to ${base}.`,
+      );
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
   function saveProject() {
     cgate()
       .project.save()
@@ -667,6 +683,15 @@ export function App() {
             title={tree.length === 0 ? 'Connect to a network first' : 'Export labels to a C-Bus project file'}
           >
             Export labels
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={exportInventory}
+            disabled={tree.length === 0}
+            title={tree.length === 0 ? 'Connect to a network first' : 'Export unit inventory CSV'}
+          >
+            Export inventory
           </button>
           <div className="statusPanelWrap" ref={statusPanelWrapRef}>
             <button

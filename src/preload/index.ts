@@ -54,6 +54,7 @@ const CH = {
   activity: 'cgate:activity',
   projectImport: 'project:import',
   projectExport: 'project:export',
+  inventoryExport: 'inventory:export',
   nodeDetail: 'nodes:detail',
   networkLevels: 'nodes:networkLevels',
   identifyUnit: 'nodes:identifyUnit',
@@ -150,6 +151,8 @@ contextBridge.exposeInMainWorld('cgate', {
     import: (): Promise<LabelImport | null> => ipcRenderer.invoke(CH.projectImport),
     export: (input: LabelExportInput): Promise<LabelExportResult | null> =>
       ipcRenderer.invoke(CH.projectExport, input),
+    exportInventory: (input: LabelExportInput): Promise<LabelExportResult | null> =>
+      ipcRenderer.invoke(CH.inventoryExport, input),
   },
   net: {
     list: (): Promise<CgateNetworkInfo[]> => ipcRenderer.invoke(CH.netList),
