@@ -2,11 +2,17 @@
 
 ## [Unreleased]
 
+## [1.4.0](https://github.com/dougrathbone/cgate-studio/compare/v1.3.2...v1.4.0) (2026-09-04)
+
 ### Features
 
 * **dist:** `npm run verify-release` checks GitHub installer assets and updater YAML (M12)
 * **ui:** human-readable unit types and measurement units; clearer filter empty states (M13)
 * **commission:** unit inventory CSV export; shared TagName mismatch helper (M14)
+
+### Documentation
+
+* M12–M14 design specs and implementation plans; expanded code-signing secret setup
 
 ## [1.3.2](https://github.com/dougrathbone/cgate-studio/compare/v1.3.1...v1.3.2) (2026-09-04)
 
