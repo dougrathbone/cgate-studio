@@ -3,8 +3,12 @@ import path from 'path';
 import {
   APP_NAME,
   GITHUB_REPO_URL,
+  GITHUB_RELEASES_URL,
+  GITHUB_ISSUES_URL,
   readLicenseText,
   openGitHubRepo,
+  openGitHubReleases,
+  openGitHubIssues,
   configureAboutPanel,
   showLicenseDialog,
   showAbout,
@@ -43,8 +47,10 @@ describe('about', () => {
     Object.defineProperty(process, 'platform', { value: originalPlatform });
   });
 
-  it('points at the canonical GitHub repository', () => {
+  it('points at the canonical GitHub repository pages', () => {
     expect(GITHUB_REPO_URL).toBe('https://github.com/dougrathbone/cgate-studio');
+    expect(GITHUB_RELEASES_URL).toBe('https://github.com/dougrathbone/cgate-studio/releases');
+    expect(GITHUB_ISSUES_URL).toBe('https://github.com/dougrathbone/cgate-studio/issues');
     expect(APP_NAME).toBe('CBus Studio');
   });
 
@@ -62,28 +68,40 @@ describe('about', () => {
     spy.mockRestore();
   });
 
-  it('openGitHubRepo opens the repo in the default browser', () => {
+  it('openGitHub helpers open the matching URLs', () => {
     openGitHubRepo();
+    openGitHubReleases();
+    openGitHubIssues();
     expect(openExternal).toHaveBeenCalledWith(GITHUB_REPO_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_RELEASES_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_ISSUES_URL);
   });
 
-  it('configureAboutPanel stamps version and ISC credits', () => {
+  it('configureAboutPanel includes repository, releases, and issues in credits', () => {
     configureAboutPanel();
     expect(setAboutPanelOptions).toHaveBeenCalledWith(
       expect.objectContaining({
         applicationName: APP_NAME,
         applicationVersion: '1.3.0',
         website: GITHUB_REPO_URL,
-        credits: expect.stringContaining('ISC'),
+        credits: expect.stringContaining(GITHUB_RELEASES_URL),
       }),
     );
+    const { credits } = setAboutPanelOptions.mock.calls[0][0];
+    expect(credits).toContain(GITHUB_ISSUES_URL);
   });
 
   it('showLicenseDialog uses a parent window when provided and opens GitHub on button 1', async () => {
     showMessageBox.mockResolvedValueOnce({ response: 1 });
     const parent = { id: 1 } as any;
     showLicenseDialog(parent);
-    expect(showMessageBox).toHaveBeenCalledWith(parent, expect.objectContaining({ title: 'License' }));
+    expect(showMessageBox).toHaveBeenCalledWith(
+      parent,
+      expect.objectContaining({
+        title: 'License',
+        buttons: ['OK', 'GitHub Repository'],
+      }),
+    );
     await Promise.resolve();
     expect(openExternal).toHaveBeenCalledWith(GITHUB_REPO_URL);
   });
@@ -96,31 +114,39 @@ describe('about', () => {
     expect(openExternal).not.toHaveBeenCalled();
   });
 
-  it('showAbout on macOS uses the native about panel', () => {
+  it('showAbout offers GitHub actions on every platform', async () => {
     Object.defineProperty(process, 'platform', { value: 'darwin' });
+    showMessageBox.mockResolvedValueOnce({ response: 2 });
     showAbout();
-    expect(showAboutPanel).toHaveBeenCalled();
-    expect(showMessageBox).not.toHaveBeenCalled();
+    expect(showAboutPanel).not.toHaveBeenCalled();
+    expect(showMessageBox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: `About ${APP_NAME}`,
+        buttons: ['OK', 'GitHub Repository', 'Releases', 'Report Issue', 'License…'],
+      }),
+    );
+    await Promise.resolve();
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_RELEASES_URL);
   });
 
-  it('showAbout on Windows opens GitHub or the license dialog from buttons', async () => {
+  it('showAbout can open issues or the license dialog from buttons', async () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
-    showMessageBox.mockResolvedValueOnce({ response: 1 });
+    showMessageBox.mockResolvedValueOnce({ response: 3 });
     showAbout();
-    expect(showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
-      title: `About ${APP_NAME}`,
-    }));
     await Promise.resolve();
-    expect(openExternal).toHaveBeenCalledWith(GITHUB_REPO_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_ISSUES_URL);
 
-    showMessageBox.mockResolvedValueOnce({ response: 2 });
+    showMessageBox.mockResolvedValueOnce({ response: 4 });
     const parent = { id: 2 } as any;
     showAbout(parent);
     await Promise.resolve();
-    expect(showMessageBox).toHaveBeenCalledWith(parent, expect.objectContaining({ title: 'License' }));
+    expect(showMessageBox).toHaveBeenCalledWith(
+      parent,
+      expect.objectContaining({ title: 'License' }),
+    );
   });
 
-  it('buildAppMenuTemplate on Windows includes a Help submenu with working clicks', () => {
+  it('buildAppMenuTemplate on Windows includes Help GitHub actions and updates', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
     const win = { id: 9 } as any;
     const onCheckForUpdates = jest.fn();
@@ -128,23 +154,42 @@ describe('about', () => {
     const help = template.find((item) => item.label === 'Help');
     expect(help).toBeDefined();
     const submenu = help!.submenu as Array<{ label?: string; click?: () => void; type?: string }>;
+    const labels = submenu.map((i) => i.label).filter(Boolean);
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        `About ${APP_NAME}`,
+        'Check for Updates…',
+        'GitHub Repository',
+        'Releases',
+        'Report an Issue',
+        'License…',
+      ]),
+    );
     submenu.find((i) => i.label === `About ${APP_NAME}`)?.click?.();
-    submenu.find((i) => i.label === 'View on GitHub')?.click?.();
+    submenu.find((i) => i.label === 'GitHub Repository')?.click?.();
+    submenu.find((i) => i.label === 'Releases')?.click?.();
+    submenu.find((i) => i.label === 'Report an Issue')?.click?.();
     submenu.find((i) => i.label === 'License…')?.click?.();
     submenu.find((i) => i.label === 'Check for Updates…')?.click?.();
     expect(showMessageBox).toHaveBeenCalled();
-    expect(openExternal).toHaveBeenCalled();
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_REPO_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_RELEASES_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_ISSUES_URL);
     expect(onCheckForUpdates).toHaveBeenCalled();
   });
 
-  it('buildAppMenuTemplate on macOS prepends the app menu', () => {
+  it('buildAppMenuTemplate on macOS prepends the app menu with GitHub actions', () => {
     Object.defineProperty(process, 'platform', { value: 'darwin' });
     const template = buildAppMenuTemplate(() => null);
     expect(template[0].label).toBe(APP_NAME);
     const submenu = template[0].submenu as Array<{ label?: string; click?: () => void }>;
-    submenu.find((i) => i.label === 'View on GitHub')?.click?.();
+    submenu.find((i) => i.label === 'GitHub Repository')?.click?.();
+    submenu.find((i) => i.label === 'Releases')?.click?.();
+    submenu.find((i) => i.label === 'Report an Issue')?.click?.();
     submenu.find((i) => i.label === 'License…')?.click?.();
-    expect(openExternal).toHaveBeenCalled();
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_REPO_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_RELEASES_URL);
+    expect(openExternal).toHaveBeenCalledWith(GITHUB_ISSUES_URL);
     expect(showMessageBox).toHaveBeenCalled();
   });
 });

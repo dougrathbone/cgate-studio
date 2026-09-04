@@ -4,6 +4,8 @@ import { app, dialog, shell, type BrowserWindow, type MenuItemConstructorOptions
 
 export const APP_NAME = 'CBus Studio';
 export const GITHUB_REPO_URL = 'https://github.com/dougrathbone/cgate-studio';
+export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
+export const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues`;
 
 const LICENSE_FALLBACK =
   'ISC License — see the project repository for the full license text.';
@@ -26,8 +28,20 @@ export function readLicenseText(): string {
   return LICENSE_FALLBACK;
 }
 
+export function openExternal(url: string): void {
+  void shell.openExternal(url);
+}
+
 export function openGitHubRepo(): void {
-  void shell.openExternal(GITHUB_REPO_URL);
+  openExternal(GITHUB_REPO_URL);
+}
+
+export function openGitHubReleases(): void {
+  openExternal(GITHUB_RELEASES_URL);
+}
+
+export function openGitHubIssues(): void {
+  openExternal(GITHUB_ISSUES_URL);
 }
 
 export function configureAboutPanel(): void {
@@ -37,7 +51,13 @@ export function configureAboutPanel(): void {
     version: app.getVersion(),
     copyright: 'Copyright © 2026 Doug Rathbone',
     website: GITHUB_REPO_URL,
-    credits: 'Open source software licensed under the ISC License.',
+    credits: [
+      'Open source software licensed under the ISC License.',
+      '',
+      `Repository: ${GITHUB_REPO_URL}`,
+      `Releases: ${GITHUB_RELEASES_URL}`,
+      `Issues: ${GITHUB_ISSUES_URL}`,
+    ].join('\n'),
   });
 }
 
@@ -47,7 +67,7 @@ export function showLicenseDialog(parent?: BrowserWindow | null): void {
     title: 'License',
     message: `${APP_NAME} — ISC License`,
     detail: readLicenseText(),
-    buttons: ['OK', 'View on GitHub'],
+    buttons: ['OK', 'GitHub Repository'],
     defaultId: 0,
     cancelId: 0,
     noLink: true,
@@ -60,11 +80,8 @@ export function showLicenseDialog(parent?: BrowserWindow | null): void {
   });
 }
 
+/** Custom About dialog with GitHub actions (used by Help on all platforms). */
 export function showAbout(parent?: BrowserWindow | null): void {
-  if (process.platform === 'darwin') {
-    app.showAboutPanel();
-    return;
-  }
   const opts = {
     type: 'info' as const,
     title: `About ${APP_NAME}`,
@@ -76,7 +93,7 @@ export function showAbout(parent?: BrowserWindow | null): void {
       '',
       'Licensed under the ISC License.',
     ].join('\n'),
-    buttons: ['OK', 'View on GitHub', 'License…'],
+    buttons: ['OK', 'GitHub Repository', 'Releases', 'Report Issue', 'License…'],
     defaultId: 0,
     cancelId: 0,
     noLink: true,
@@ -86,8 +103,18 @@ export function showAbout(parent?: BrowserWindow | null): void {
     : dialog.showMessageBox(opts);
   void promise.then(({ response }) => {
     if (response === 1) openGitHubRepo();
-    if (response === 2) showLicenseDialog(parent);
+    if (response === 2) openGitHubReleases();
+    if (response === 3) openGitHubIssues();
+    if (response === 4) showLicenseDialog(parent);
   });
+}
+
+function githubHelpItems(): MenuItemConstructorOptions[] {
+  return [
+    { label: 'GitHub Repository', click: () => openGitHubRepo() },
+    { label: 'Releases', click: () => openGitHubReleases() },
+    { label: 'Report an Issue', click: () => openGitHubIssues() },
+  ];
 }
 
 function helpSubmenu(
@@ -105,10 +132,8 @@ function helpSubmenu(
       click: () => onCheckForUpdates?.(),
     },
     { type: 'separator' },
-    {
-      label: 'View on GitHub',
-      click: () => openGitHubRepo(),
-    },
+    ...githubHelpItems(),
+    { type: 'separator' },
     {
       label: 'License…',
       click: () => showLicenseDialog(getWindow()),
@@ -130,7 +155,7 @@ function macAppMenu(
         click: () => onCheckForUpdates?.(),
       },
       { type: 'separator' },
-      { label: 'View on GitHub', click: () => openGitHubRepo() },
+      ...githubHelpItems(),
       { label: 'License…', click: () => showLicenseDialog(getWindow()) },
       { type: 'separator' },
       { role: 'services' },
