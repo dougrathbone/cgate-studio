@@ -1,7 +1,7 @@
 {
   "name": "cbus-studio",
   "productName": "CBus Studio",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A cross-platform (macOS-first) desktop app to **browse, organize, and test** a Clipsal C-Bus network — without needing a Windows machine running C-Bus Toolkit.",
   "main": "out/main/index.js",
   "scripts": {
