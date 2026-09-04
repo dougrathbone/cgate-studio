@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { GroupNode, GroupState, TreeSelection } from '../../shared/types';
+import { nextFilterIndex } from '../../shared/filterNav';
 import { useFilterHotkeys, useFilterRef } from '../hooks/useFilterHotkeys';
 
 function matches(g: GroupNode, q: string): boolean {
@@ -37,6 +38,14 @@ export function GroupsWorkspace({
   const selectedGroups = rows.filter((g) => selected.has(g.address));
   const allVisibleSelected = rows.length > 0 && rows.every((g) => selected.has(g.address));
 
+  function moveSelection(direction: 'up' | 'down') {
+    if (!onSelect || rows.length === 0) return;
+    const current = selectedKey ? rows.findIndex((g) => g.address === selectedKey) : -1;
+    const next = nextFilterIndex(rows.length, current, direction);
+    if (next < 0) return;
+    onSelect({ kind: 'group', group: rows[next] });
+  }
+
   function toggleOne(address: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -66,9 +75,18 @@ export function GroupsWorkspace({
           ref={filterRef}
           className="filter"
           type="search"
-          placeholder={`Filter ${rows.length} groups…`}
+          placeholder={`Filter ${rows.length} groups… (/ to focus)`}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              moveSelection('down');
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              moveSelection('up');
+            }
+          }}
           aria-label="Filter groups"
         />
         <div className="commTable__actions">
@@ -120,7 +138,7 @@ export function GroupsWorkspace({
         </div>
       </div>
       {rows.length === 0 ? (
-        <p className="commTable__empty">No groups to show.</p>
+        <p className="commTable__empty">{filter.trim() ? 'No matches.' : 'No groups to show.'}</p>
       ) : (
         <div className="commTable__scroll">
           <table className="commTable__table">

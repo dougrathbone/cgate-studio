@@ -36,6 +36,31 @@ describe('GroupsWorkspace', () => {
     expect(screen.getByText('Dining')).toBeInTheDocument();
   });
 
+  it('moves group selection with arrow keys from the filter', () => {
+    const onSelect = jest.fn();
+    function Harness() {
+      const [selection, setSelection] = React.useState<import('../../src/shared/types').TreeSelection | null>(null);
+      return (
+        <GroupsWorkspace
+          groups={groups}
+          states={{}}
+          selection={selection}
+          onSelect={(sel) => {
+            onSelect(sel);
+            setSelection(sel);
+          }}
+        />
+      );
+    }
+    render(<Harness />);
+    const filter = screen.getByLabelText('Filter groups');
+    filter.focus();
+    fireEvent.keyDown(filter, { key: 'ArrowDown' });
+    expect(onSelect.mock.calls[0][0].group.address).toBe('254/56/4');
+    fireEvent.keyDown(filter, { key: 'ArrowDown' });
+    expect(onSelect.mock.calls[onSelect.mock.calls.length - 1][0].group.address).toBe('254/56/5');
+  });
+
   it('bulk Off sends selected groups at level 0', () => {
     const onBulkSetLevel = jest.fn();
     render(

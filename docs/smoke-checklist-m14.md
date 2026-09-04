@@ -16,4 +16,6 @@ Against a live C-Gate (or mock) with a loaded project/network.
 ## Safety
 
 - [ ] Inventory export does **not** mark the project dirty
+- [ ] **Refresh params** updates Serial/Firmware from GET and does **not** mark dirty
 - [ ] No Add group / programming UI introduced
+- [ ] ArrowUp/Down from Inventory/Groups filter moves the inspector selection

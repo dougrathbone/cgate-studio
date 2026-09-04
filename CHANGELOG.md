@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Features
+
+* **ui:** ArrowUp/Down from Groups/Inventory filters moves selection; inventory Refresh params (GET) without dirtying the project
+
 ## [1.4.1](https://github.com/dougrathbone/cgate-studio/compare/v1.4.0...v1.4.1) (2026-09-04)
 
 ### Features
