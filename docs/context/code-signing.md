@@ -40,6 +40,10 @@ CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:win
 
 CI does the same when the corresponding `*_CSC_LINK` secret is empty.
 
+Each GitHub Release body includes a **This release signing status** line (`signed` /
+`unsigned` / `unknown` per platform) so readers know whether that tag’s artifacts
+were signed, not only the general policy.
+
 ## Auto-update
 
 Packaged apps check [GitHub Releases](https://github.com/dougrathbone/cgate-studio/releases) via `electron-updater`. Each release must attach:

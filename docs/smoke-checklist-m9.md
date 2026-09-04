@@ -2,6 +2,8 @@
 
 Against a live C-Gate 3.x (or mock) with a disposable project / known-safe groups.
 
+**Wire note (2026-09-04):** read-only `DBGET //5COGAN/254/56/0/TagName` returned `342 …/TagName=…` on desk C-Gate 3.3.2. The checklist below is still the UI + write path.
+
 ## Rename (TagName)
 
 - [ ] Connect → Operate or Commission → rename a group label in the tree

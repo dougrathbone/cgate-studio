@@ -26,5 +26,7 @@ describe('M11 distribution config', () => {
     expect(yml).toContain('*.yml');
     expect(yml).toContain('*.blockmap');
     expect(yml).toContain('*.AppImage');
+    expect(yml).toContain('signing-status-');
+    expect(yml).toContain('This release signing status');
   });
 });

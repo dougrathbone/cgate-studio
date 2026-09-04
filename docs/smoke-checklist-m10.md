@@ -4,8 +4,8 @@ Against a live C-Gate 3.x (or mock).
 
 ## Bulk levels (M5 harden)
 
-- [x] **Live confirmed (3.3.2):** `GET //proj/net/* level` fails when any app lacks `level`
-- [x] **Live confirmed:** `GET //proj/net/56/* level` works (`300-` continuations)
+- [x] **Live confirmed (3.3.2; reconfirmed 2026-09-04 on 5COGAN):** `GET //proj/net/* level` fails when any app lacks `level`
+- [x] **Live confirmed (reconfirmed 2026-09-04):** `GET //proj/net/56/* level` works (`300-` continuations; 70 groups sampled)
 - [ ] Connect → levels hydrate for lighting groups without waiting on per-group enrichment alone
 - [ ] Apps without level (e.g. 202) are skipped without error banner
 

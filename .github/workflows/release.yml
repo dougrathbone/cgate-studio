@@ -71,12 +71,15 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           npm run build
+          mkdir -p release
           if [ -n "$CSC_LINK" ]; then
             echo "macOS: signing + notarize"
             npx electron-builder --mac --publish never -c.mac.notarize=true
+            echo "signed" > release/signing-status-mac.txt
           else
             echo "macOS: unsigned fallback (MACOS_CSC_LINK unset)"
             CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --publish never -c.mac.identity=null
+            echo "unsigned" > release/signing-status-mac.txt
           fi
 
       - name: Build native installer (Windows)
@@ -87,17 +90,22 @@ jobs:
         shell: bash
         run: |
           npm run build
+          mkdir -p release
           if [ -n "$CSC_LINK" ]; then
             echo "Windows: Authenticode signing"
             npx electron-builder --win --publish never
+            echo "signed" > release/signing-status-win.txt
           else
             echo "Windows: unsigned fallback (WIN_CSC_LINK unset)"
             CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --win --publish never
+            echo "unsigned" > release/signing-status-win.txt
           fi
 
       - name: Build native installer (Linux)
         if: matrix.platform == 'linux'
-        run: npm run dist:linux
+        run: |
+          npm run dist:linux
+          echo "n/a" > release/signing-status-linux.txt
 
       - name: List release outputs
         shell: bash
@@ -117,6 +125,7 @@ jobs:
             release/*.AppImage
             release/*.yml
             release/*.blockmap
+            release/signing-status-*.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -136,6 +145,32 @@ jobs:
       - name: List assets to publish
         run: find installers -type f | sort
 
+      - name: Compose release notes
+        id: notes
+        shell: bash
+        run: |
+          mac=$(cat installers/signing-status-mac.txt 2>/dev/null || echo unknown)
+          win=$(cat installers/signing-status-win.txt 2>/dev/null || echo unknown)
+          {
+            echo "## Installers"
+            echo
+            echo "| Platform | File | Notes |"
+            echo "|----------|------|-------|"
+            echo "| **macOS** | \`.dmg\` | Recommended — drag to Applications |"
+            echo "| **macOS** | \`-mac.zip\` | Portable archive (Apple Silicon + Intel); used for auto-update |"
+            echo "| **Windows** | \`.exe\` | NSIS installer — choose install directory |"
+            echo "| **Linux** | \`.AppImage\` | x64 |"
+            echo
+            echo "**This release signing status:** macOS **${mac}**, Windows **${win}**, Linux n/a."
+            echo
+            echo "When secrets are set, CI signs with **Developer ID + notarization** (macOS) and **Authenticode** (Windows). Missing secrets produce an unsigned artifact for that platform (Gatekeeper / SmartScreen warnings). See [code signing](https://github.com/dougrathbone/cgate-studio/blob/main/docs/context/code-signing.md)."
+            echo
+            echo "Packaged apps check this GitHub Release for updates (Help → Check for Updates)."
+          } > /tmp/release-body.md
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/release-body.md >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Publish release with installers attached
         uses: softprops/action-gh-release@v2
         with:
@@ -151,16 +186,4 @@ jobs:
             installers/**/*.blockmap
           fail_on_unmatched_files: false
           append_body: true
-          body: |
-            ## Installers
-
-            | Platform | File | Notes |
-            |----------|------|-------|
-            | **macOS** | `.dmg` | Recommended — drag to Applications |
-            | **macOS** | `-mac.zip` | Portable archive (Apple Silicon + Intel); used for auto-update |
-            | **Windows** | `.exe` | NSIS installer — choose install directory |
-            | **Linux** | `.AppImage` | x64 |
-
-            Signing: **Developer ID + notarization** on macOS and **Authenticode** on Windows when the matching GitHub Actions secrets are set. If a platform secret is missing, that installer is **unsigned** (Gatekeeper / SmartScreen warnings). See [code signing](https://github.com/dougrathbone/cgate-studio/blob/main/docs/context/code-signing.md).
-
-            Packaged apps check this GitHub Release for updates (Help → Check for Updates).
+          body: ${{ steps.notes.outputs.body }}

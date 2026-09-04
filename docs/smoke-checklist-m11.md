@@ -4,10 +4,12 @@ Signing and auto-update cannot be fully proven without Apple / Windows certifica
 
 ## Unsigned fallback (no secrets)
 
-- [ ] Release workflow completes on macOS, Windows, and Linux
-- [ ] GitHub Release includes `.dmg`, `-mac.zip`, Windows `.exe`, `.AppImage`
-- [ ] Release includes `latest.yml`, `latest-mac.yml`, `latest-linux.yml` (and `.blockmap` when electron-builder emits them)
-- [ ] Release notes say installers are unsigned when certs were missing
+Proven on **v1.3.2** (2026-09-04) — Release workflow logs showed `MACOS_CSC_LINK` / `WIN_CSC_LINK` unset; installers published anyway.
+
+- [x] Release workflow completes on macOS, Windows, and Linux
+- [x] GitHub Release includes `.dmg`, `-mac.zip`, Windows `.exe`, `.AppImage`
+- [x] Release includes `latest.yml`, `latest-mac.yml`, `latest-linux.yml` (and `.blockmap` when electron-builder emits them)
+- [x] CI used unsigned fallback when certs were missing; **v1.3.2** release notes updated to state macOS/Windows **unsigned**. Future tags emit per-build status from the Release workflow.
 
 ## Signed macOS (secrets present)
 
@@ -21,6 +23,8 @@ Signing and auto-update cannot be fully proven without Apple / Windows certifica
 - [ ] SmartScreen is absent or reduced vs the unsigned 1.3.0 exe (EV still best)
 
 ## Auto-update
+
+Updater metadata for **v1.3.2** is published (`latest-mac.yml` / `latest.yml` / `latest-linux.yml` point at 1.3.2). End-to-end N→N+1 still needs a desk install:
 
 - [ ] Install packaged N, publish N+1, launch N → banner **Restart to update**
 - [ ] Restart lands on N+1 (`About` version)
