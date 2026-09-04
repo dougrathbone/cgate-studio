@@ -136,6 +136,10 @@ function installApi(initialSites: Site[] = [homeSite]) {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('loads saved sites on mount and subscribes to updates', async () => {
     const { api, fireStatus } = installApi();
     render(<App />);
@@ -193,6 +197,22 @@ describe('App', () => {
       eventPort: 20025,
     });
     expect(await screen.findByText('Office')).toBeInTheDocument();
+  });
+
+  it('collapses and restores the sites sidebar', async () => {
+    window.localStorage.setItem('cbus.sidebarOpen', '1');
+    installApi();
+    render(<App />);
+    await screen.findByText('Home');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide sites panel' }));
+    expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show sites panel' })).toBeInTheDocument();
+    expect(window.localStorage.getItem('cbus.sidebarOpen')).toBe('0');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show sites panel' }));
+    expect(await screen.findByText('Home')).toBeInTheDocument();
+    expect(window.localStorage.getItem('cbus.sidebarOpen')).toBe('1');
   });
 
   it('removes a site, clearing the active selection when it was connected', async () => {

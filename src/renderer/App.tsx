@@ -150,6 +150,13 @@ export function App() {
   const [editingSite, setEditingSite] = useState<Site | null>(null);
   /** null = auto: open when no sites yet, collapsed otherwise */
   const [addSiteOpen, setAddSiteOpen] = useState<boolean | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem('cbus.sidebarOpen') !== '0';
+    } catch {
+      return true;
+    }
+  });
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
 
   const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -357,6 +364,14 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selection]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('cbus.sidebarOpen', sidebarOpen ? '1' : '0');
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [sidebarOpen]);
 
   async function addSite(input: SiteInput) {
     setSites(await cgate().sites.add(input));
@@ -791,52 +806,76 @@ export function App() {
       )}
 
       <div className="app__body">
-        <aside className="sidebar">
-          <h3 className="sidebar__title">Sites</h3>
-          <div className="sidebar__scroll">
-            <SiteList
-              sites={sites}
-              activeId={activeSiteId}
-              activeStatus={status}
-              connectDisabled={connectBusy || status === 'connecting'}
-              onConnect={connectSite}
-              onDisconnect={() => { void disconnectSite(); }}
-              onEdit={setEditingSite}
-              onRemove={removeSite}
-            />
-          </div>
-          {editingSite ? (
-            <SiteForm
-              mode="edit"
-              initial={editingSite}
-              onSave={(s) => { void saveSite(s); }}
-              onCancel={() => setEditingSite(null)}
-            />
-          ) : (
-            <div className="sidebar__add">
+        {sidebarOpen ? (
+          <aside className="sidebar" aria-label="Sites">
+            <div className="sidebar__header">
+              <h3 className="sidebar__title">Sites</h3>
               <button
                 type="button"
-                className="sidebar__addToggle"
-                aria-expanded={addSiteOpen ?? sites.length === 0}
-                onClick={() => setAddSiteOpen((v) => !(v ?? sites.length === 0))}
+                className="sidebar__collapse"
+                aria-label="Hide sites panel"
+                title="Hide sites"
+                onClick={() => setSidebarOpen(false)}
               >
-                <span className="sidebar__addCaret" aria-hidden>
-                  {(addSiteOpen ?? sites.length === 0) ? '\u25BE' : '\u25B8'}
-                </span>
-                Add a site
+                ‹
               </button>
-              {(addSiteOpen ?? sites.length === 0) && (
-                <SiteForm
-                  mode="add"
-                  onAdd={(input) => {
-                    void addSite(input);
-                    setAddSiteOpen(false);
-                  }}
-                />
-              )}
             </div>
-          )}
-        </aside>
+            <div className="sidebar__scroll">
+              <SiteList
+                sites={sites}
+                activeId={activeSiteId}
+                activeStatus={status}
+                connectDisabled={connectBusy || status === 'connecting'}
+                onConnect={connectSite}
+                onDisconnect={() => { void disconnectSite(); }}
+                onEdit={setEditingSite}
+                onRemove={removeSite}
+              />
+            </div>
+            {editingSite ? (
+              <SiteForm
+                mode="edit"
+                initial={editingSite}
+                onSave={(s) => { void saveSite(s); }}
+                onCancel={() => setEditingSite(null)}
+              />
+            ) : (
+              <div className="sidebar__add">
+                <button
+                  type="button"
+                  className="sidebar__addToggle"
+                  aria-expanded={addSiteOpen ?? sites.length === 0}
+                  onClick={() => setAddSiteOpen((v) => !(v ?? sites.length === 0))}
+                >
+                  <span className="sidebar__addCaret" aria-hidden>
+                    {(addSiteOpen ?? sites.length === 0) ? '\u25BE' : '\u25B8'}
+                  </span>
+                  Add a site
+                </button>
+                {(addSiteOpen ?? sites.length === 0) && (
+                  <SiteForm
+                    mode="add"
+                    onAdd={(input) => {
+                      void addSite(input);
+                      setAddSiteOpen(false);
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </aside>
+        ) : (
+          <button
+            type="button"
+            className="sidebarRail"
+            aria-label="Show sites panel"
+            title="Show sites"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <span className="sidebarRail__label">Sites</span>
+            <span aria-hidden>›</span>
+          </button>
+        )}
         <main className={`main${selection ? ' main--split' : ''}${activityOpen ? ' main--activity' : ''}`}>
           {lastTrigger && (
             <div className="lastTrigger" title={lastTrigger.address}>
