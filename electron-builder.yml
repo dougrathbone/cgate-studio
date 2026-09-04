@@ -14,7 +14,11 @@ extraResources:
 
 directories:
   output: release
-  buildResources: build
+  # Icons live under resources/ (build/ is gitignored).
+  buildResources: resources
+
+# App icon (light-bulb Control Console mark). electron-builder derives .icns/.ico.
+icon: resources/icon.png
 
 # electron-updater reads these from GitHub Releases (latest.yml / latest-mac.yml / latest-linux.yml).
 publish:

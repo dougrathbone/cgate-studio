@@ -7,6 +7,7 @@
 * **dist:** sign and notarize installers when GitHub Actions secrets are set; unsigned fallback otherwise (M11)
 * **dist:** in-app auto-update from GitHub Releases (`electron-updater`); Help → Check for Updates
 * **dist:** Linux x64 AppImage on the Release workflow
+* **ui:** custom Control Console app icon (amber light bulb on slate)
 
 ### Documentation
 

@@ -10,8 +10,11 @@ describe('M11 distribution config', () => {
     expect(yml).toContain('repo: cgate-studio');
     expect(yml).toContain('AppImage');
     expect(yml).toContain('resources/entitlements.mac.plist');
+    expect(yml).toContain('resources/icon.png');
+    expect(yml).toContain('buildResources: resources');
     expect(yml).not.toMatch(/identity:\s*null/);
     expect(fs.existsSync(path.join(root, 'resources/entitlements.mac.plist'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'resources/icon.png'))).toBe(true);
   });
 
   it('release workflow signs when secrets exist and still publishes updater files', () => {
