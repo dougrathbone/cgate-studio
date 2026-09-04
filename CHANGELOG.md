@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.4.1](https://github.com/dougrathbone/cgate-studio/compare/v1.4.0...v1.4.1) (2026-09-04)
+
+### Features
+
+* **ui:** collapse Add a site by default; collapsible sites sidebar with restore rail
+
 ## [1.4.0](https://github.com/dougrathbone/cgate-studio/compare/v1.3.2...v1.4.0) (2026-09-04)
 
 ### Features
