@@ -178,7 +178,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Publish release with installers attached
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # Tag push -> ref_name; manual run -> the tag input. Creates the release
           # if it doesn't exist yet, otherwise attaches to the existing one.
