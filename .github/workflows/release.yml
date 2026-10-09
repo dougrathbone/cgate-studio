@@ -121,7 +121,7 @@ jobs:
           ls -la release/*.dmg release/*.exe release/*-mac.zip release/*.AppImage release/*.yml release/*.blockmap 2>/dev/null || true
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: installer-${{ matrix.platform }}
           path: |
