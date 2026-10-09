@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Build the exact tagged commit (tag push -> ref_name; manual -> input).
           ref: ${{ github.event.inputs.tag || github.ref_name }}
