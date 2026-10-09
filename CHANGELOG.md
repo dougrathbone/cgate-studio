@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [1.4.3](https://github.com/dougrathbone/cgate-studio/compare/v1.4.2...v1.4.3) (2026-10-09)
+
+### Features
+
+* **security:** validate privileged IPC args; CSP, sandbox, and navigation lockdown in the renderer
+* **sites:** persist default project/network; encrypt saved LOGIN passwords with OS `safeStorage`
+* **main:** split C-Gate command channel and event bridge out of `CgateService`; surface `lastError` on server status
+
+### Fixes
+
+* Release workflow runs type-check and coverage before building installers
+* Branch coverage restored above the 80% CI threshold (inventory export + validation tests)
+
+### Documentation
+
+* Point agents at `docs/superpowers/`; CONTRIBUTING, SECURITY, Dependabot; harden cgateweb tag-pin docs
+
 ## [1.4.2](https://github.com/dougrathbone/cgate-studio/compare/v1.4.1...v1.4.2) (2026-09-04)
 
 ### Features

@@ -50,8 +50,9 @@ its documented interface." CBus Studio is that front-end.
 - Save **multiple C-Gate sites** (one per location) — name + host + command/event
   ports — and switch between them with one click. Sites persist locally (in the
   app's `userData` directory) so installers don't re-type connection details.
-  Edit a site anytime; optional C-Gate LOGIN credentials and default
-  project/network are stored with the site.
+  Optional default project/network are stored with the site. Optional C-Gate
+  LOGIN passwords are encrypted with the OS keychain (`safeStorage`) when
+  available; otherwise login is session-only and not written to disk.
 - Connect to an existing C-Gate over TCP (command + event/status ports). Explicit
   **Disconnect** tears the session down without auto-reconnect.
 - Pick the active **project** and **network** from the header session bar
@@ -155,6 +156,22 @@ its documented interface." CBus Studio is that front-end.
   the background. A banner offers **Restart to update**. Development runs skip
   the check (the menu item explains why).
 
+### Installer trust (M12)
+
+- `npm run verify-release -- vX.Y.Z` checks GitHub Release assets and updater
+  YAML after a tag publish (signing status may warn `unsigned` when secrets are
+  unset).
+
+### Operate polish (M13)
+
+- Human-readable unit type labels, clearer empty states, and filter keyboard
+  navigation (ArrowUp/Down from the filter field).
+
+### Commission depth (M14)
+
+- Commission **Inventory** view can export a unit CSV and refresh per-unit
+  parameters from C-Gate.
+
 ### Reliability
 
 - Command-channel access is **serialized**, so a tree refresh can't interleave
@@ -208,6 +225,8 @@ is wired to. So:
 npm install          # install dependencies
 npm run dev          # launch the app (electron-vite dev)
 npm test             # run the Jest test suite
+npm run test:ci      # type-check + coverage thresholds (what CI runs)
+npm run lint         # ESLint (advisory)
 npm run test:coverage # run tests + enforce the 80% coverage threshold
 npm run build        # production build (main + preload + renderer)
 ```
@@ -313,6 +332,11 @@ Studio-specific project-label parser stay in `src/cgate-client/`. See
 - **No MQTT / Home Assistant** — that is `cgateweb`'s job.
 - **No bundled C-Gate / JRE** — connect to a C-Gate you already run.
 - **No serial/USB PCI** — CNI/Ethernet only.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, `npm run test:ci`, and the
+`cgateweb` tag-bump process. Security reports: [`SECURITY.md`](SECURITY.md).
 
 ## License
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { ConnectionStatus } from '../../shared/types';
 import type { CgateServerStatus } from '../../shared/cgateStatus';
 import { CloseButton } from './CloseButton';
@@ -52,8 +52,17 @@ export function CgateStatusPanel({
   onClose: () => void;
   dismissRootRef?: React.RefObject<HTMLElement | null>;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const focusable = panelRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.focus();
+
     const onPointerDown = (e: PointerEvent) => {
       const root = dismissRootRef?.current;
       if (!root) return;
@@ -67,6 +76,7 @@ export function CgateStatusPanel({
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused.current?.focus?.();
     };
   }, [open, onClose, dismissRootRef]);
 
@@ -75,7 +85,13 @@ export function CgateStatusPanel({
   const connOk = server?.commandConnected && server?.eventConnected;
 
   return (
-    <div className="statusPanel" role="dialog" aria-label="C-Gate server status">
+    <div
+      ref={panelRef}
+      className="statusPanel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="C-Gate server status"
+    >
       <header className="statusPanel__header">
         <h2 className="statusPanel__title">C-Gate server</h2>
         <div className="statusPanel__actions">
@@ -119,6 +135,9 @@ export function CgateStatusPanel({
         ))}
         {server && connection === 'connected' && row('Loaded projects', projectList(server.loadedProjects))}
         {server && connection === 'connected' && row('Projects on disk', projectList(server.projectsOnDisk))}
+        {server?.lastError && row('Last error', (
+          <span className="statusPanel__warn">{server.lastError}</span>
+        ))}
       </dl>
 
       {server?.serverGreeting && (

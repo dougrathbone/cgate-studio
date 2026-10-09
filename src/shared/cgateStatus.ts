@@ -23,4 +23,6 @@ export interface CgateServerStatus {
   loadedProjects: CgateProjectInfo[];
   /** Project files found in the tag directory (PROJECT DIR). */
   projectsOnDisk: CgateProjectInfo[];
+  /** Last sanitized command/list failure message, when any. */
+  lastError?: string | null;
 }

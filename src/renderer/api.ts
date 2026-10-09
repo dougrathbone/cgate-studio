@@ -23,6 +23,7 @@ import type { CgateServerStatus, CgateProjectInfo } from '../shared/cgateStatus'
 
 interface SitesApi {
   list(): Promise<Site[]>;
+  canPersistPassword(): Promise<boolean>;
   add(input: SiteInput): Promise<Site[]>;
   update(site: Site): Promise<Site[]>;
   remove(id: string): Promise<Site[]>;

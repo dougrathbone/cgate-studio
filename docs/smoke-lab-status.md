@@ -28,7 +28,19 @@ Read-only TCP probe against project `5COGAN` / network `254`:
 | `TREEXML //5COGAN/254` | XML snippet begins (`343` / `347`) |
 | `DBGET …/TagName` | e.g. `342 …/TagName=Main bed blind Southside` |
 
-UI-driven M9 writes (`DBSET` / `PROJECT SAVE`), Identify blink, and Operate controls still need a desk pass in the per-milestone checklists.
+## Live wire reconfirm (2026-09-12, same desk)
+
+Same host/project/net; still C-Gate **3.3.2 build 1855**. Reconfirmed greeting, `PROJECT LIST`, `NET LIST`, per-app levels, network-wide `402`, `TREEXML` (~60 units), and `DBGET …/TagName`.
+
+| Item | Result |
+|---|---|
+| `GET //5COGAN/254/p/0 SerialNumber` | `300` → `100928.2326` |
+| `GET //5COGAN/254/p/0 FirmwareVersion` | `300` → `01.03.00` |
+| `GET //5COGAN/254/p/0 Type` | `300` → `KEYGL5` |
+| `ID //5COGAN/254/p/0` | `521 Unit unavailable: Identify failed` (expected soft failure) |
+| `TREE //5COGAN/254` | Unit list starts at `p/0` KEYGL5; CNI `192.168.0.2:10001` ok |
+
+**Still needs a human at the desk (UI / physical):** M8–M10 / M14 checklist boxes — Operate/Commission UI, bulk On/Off, rename + `PROJECT SAVE`, Identify blink when a unit supports it, CSV exports, filter keyboard, inventory Refresh params / export.
 
 ## Covered by automated tests (mock C-Gate + jsdom)
 

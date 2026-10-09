@@ -2,12 +2,25 @@ import React, { useEffect, useState } from 'react';
 import type { Site, SiteInput } from '../../shared/types';
 
 type Props =
-  | { mode: 'add'; onAdd: (s: SiteInput) => void; onCancel?: never; initial?: never }
-  | { mode: 'edit'; initial: Site; onSave: (s: Site) => void; onCancel: () => void };
+  | {
+      mode: 'add';
+      onAdd: (s: SiteInput) => void;
+      onCancel?: never;
+      initial?: never;
+      canPersistPassword?: boolean;
+    }
+  | {
+      mode: 'edit';
+      initial: Site;
+      onSave: (s: Site) => void;
+      onCancel: () => void;
+      canPersistPassword?: boolean;
+    };
 
 export function SiteForm(props: Props) {
   const editing = props.mode === 'edit';
   const initial = editing ? props.initial : null;
+  const canPersistPassword = props.canPersistPassword !== false;
 
   const [name, setName] = useState(initial?.name ?? '');
   const [host, setHost] = useState(initial?.host ?? '127.0.0.1');
@@ -104,21 +117,29 @@ export function SiteForm(props: Props) {
         {showAuth ? 'Hide login' : 'C-Gate login…'}
       </button>
       {showAuth && (
-        <div className="field--row">
-          <label className="field">
-            User
-            <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
-          </label>
-          <label className="field">
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-        </div>
+        <>
+          <div className="field--row">
+            <label className="field">
+              User
+              <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+            </label>
+            <label className="field">
+              Password
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={!canPersistPassword && !password}
+              />
+            </label>
+          </div>
+          {!canPersistPassword && (
+            <p className="siteForm__hint" role="note">
+              This system cannot encrypt saved passwords. Login is used for this session only and will not be stored.
+            </p>
+          )}
+        </>
       )}
       <div className="field--row">
         <button type="submit" className="btn btn--primary">

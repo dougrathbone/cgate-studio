@@ -1,6 +1,24 @@
+jest.mock('electron', () => {
+  const key = Buffer.from('test-key-material-32-bytes-long!!');
+  return {
+    safeStorage: {
+      isEncryptionAvailable: jest.fn(() => true),
+      encryptString: jest.fn((s: string) => Buffer.from(`enc:${s}`, 'utf8')),
+      decryptString: jest.fn((b: Buffer) => {
+        const raw = b.toString('utf8');
+        if (!raw.startsWith('enc:')) throw new Error('bad cipher');
+        return raw.slice(4);
+      }),
+    },
+    // unused but keeps accidental imports quiet
+    __key: key,
+  };
+});
+
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { safeStorage } from 'electron';
 import { SiteStore } from '../../src/main/SiteStore';
 
 describe('SiteStore', () => {
@@ -96,5 +114,63 @@ describe('SiteStore', () => {
     const store = new SiteStore(nested);
     store.add(input);
     expect(fs.existsSync(nested)).toBe(true);
+  });
+
+  it('persists default project/network and encrypted password', () => {
+    const store = new SiteStore(file);
+    store.add({
+      ...input,
+      username: 'admin',
+      password: 'secret',
+      defaultProject: 'PROJ',
+      defaultNetwork: '254',
+    });
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    expect(raw[0].password).toBeUndefined();
+    expect(raw[0].passwordEnc).toBeTruthy();
+    expect(raw[0].defaultProject).toBe('PROJ');
+    expect(raw[0].defaultNetwork).toBe('254');
+    const [site] = store.list();
+    expect(site.username).toBe('admin');
+    expect(site.password).toBe('secret');
+    expect(site.defaultProject).toBe('PROJ');
+  });
+
+  it('drops password when OS encryption is unavailable', () => {
+    (safeStorage.isEncryptionAvailable as jest.Mock).mockReturnValueOnce(false);
+    const store = new SiteStore(file);
+    store.add({ ...input, password: 'secret' });
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    expect(raw[0].passwordEnc).toBeUndefined();
+    expect(store.list()[0].password).toBeUndefined();
+  });
+
+  it('keeps prior encrypted password when update omits password field', () => {
+    const store = new SiteStore(file);
+    const [created] = store.add({ ...input, password: 'secret' });
+    store.update({
+      id: created.id,
+      name: 'Renamed',
+      host: created.host,
+      commandPort: created.commandPort,
+      eventPort: created.eventPort,
+    });
+    expect(store.list()[0].password).toBe('secret');
+    expect(store.list()[0].name).toBe('Renamed');
+  });
+
+  it('clears password when update sets empty string', () => {
+    const store = new SiteStore(file);
+    const [created] = store.add({ ...input, password: 'secret' });
+    store.update({ ...created, password: '' });
+    expect(store.list()[0].password).toBeUndefined();
+  });
+
+  it('reports encryption availability', () => {
+    expect(new SiteStore(file).encryptionAvailable()).toBe(true);
+    (safeStorage.isEncryptionAvailable as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('no keychain');
+    });
+    expect(new SiteStore(file).encryptionAvailable()).toBe(false);
   });
 });

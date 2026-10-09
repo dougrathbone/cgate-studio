@@ -1,7 +1,7 @@
 # C-Gate client (Phase B)
 
 CBus Studio consumes the protocol surface of [`cgateweb`](https://github.com/dougrathbone/cgateweb)
-as a git dependency. Import **only** the library barrels — never the package root:
+as a **tagged git dependency**. Import **only** the library barrels — never the package root:
 
 ```js
 require('cgateweb/cgate-client')           // transport, parsers, protocol constants
@@ -12,9 +12,18 @@ The bare `cgateweb` entry is the MQTT/HA **bridge application**. It loads
 `settings.js` from the cwd, writes to stdout, and can call `process.exit`.
 The barrels are import-pure.
 
-Pin the dependency to a **cgateweb release tag** in `package.json`
-(currently `github:dougrathbone/cgateweb#v1.32.0`). Bump the tag when you
-want protocol fixes; do not track `master`.
+## Pinning and install
+
+- Pin to a **cgateweb release tag** in `package.json` (currently
+  `github:dougrathbone/cgateweb#v1.32.0`).
+- Always install with **`npm ci`** so `package-lock.json` resolves the exact
+  git commit. Do not track `master`.
+- To bump: change the tag in `package.json`, run `npm install`, commit the
+  lockfile commit hash change, and run `npm run test:ci`.
+
+This repo stays a **standalone** product (not an npm workspaces monorepo and not
+a git submodule of cgateweb). Upstream protocol fixes land in cgateweb; Studio
+bumps the tag.
 
 ## What Studio still keeps locally (`src/cgate-client/`)
 
@@ -26,6 +35,9 @@ behaviour):
 | `treexml.js` | C-Gate `TREEXML` line-stripping + tree parse for the desktop UI |
 | `cbusProjectExporter.js` | Toolkit-compatible XML/CBZ **export** (CSV is in `projectExport.ts`) |
 | `cbusProjectParser.js` | Fork that also returns `networkLabels` / `applicationLabels`. Upstream `cgateweb/cgate-client/project` is group-labels only and lazy-loads sql.js WASM, which asar packaging does not yet locate |
+
+**Upstream candidates** (contribute to cgateweb, then delete the local fork):
+enriched project parser labels, TREEXML helper, CBZ exporter.
 
 Do not vendor `cgateConnection.js`, `cbusEvent.js`, `constants.js`, `logger.js`,
 or `backoff.js` again — they come from the barrel.

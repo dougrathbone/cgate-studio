@@ -1,9 +1,7 @@
 import { EventEmitter } from 'events';
-import { StringDecoder } from 'string_decoder';
 import type {
   ConnectOptions,
   Tree,
-  GroupState,
   ConnectionStatus,
   GroupRef,
   CommandResult,
@@ -16,106 +14,64 @@ import type { CgateObjectParams } from '../shared/types';
 import type { CgateServerStatus } from '../shared/cgateStatus';
 import type { CgateProjectInfo } from '../shared/cgateStatus';
 import {
-  isServiceReadyLine,
   parseProjectLines,
   parseServerVersion,
   resolveActiveProject,
 } from './cgateStatusParse';
 import { parseNetworkLines, parseNetworkHealthFromGet } from './cgateSessionParse';
 import { formatCgateSetValue, parseObjectParams } from './cgateParamParse';
-import { parseMeasurementEvent } from './measurementParse';
-
-// Import from cgateweb's protocol barrel (not the app entry). electron-vite
-// inlines the CommonJS modules into the main bundle.
-import { CgateConnection, CBusEvent, constants } from 'cgateweb/cgate-client';
+import { CgateConnection } from 'cgateweb/cgate-client';
 import { parseTreeXml } from '../cgate-client/treexml';
-
-const { CGATE_RESPONSE_SYSTEM_EVENT } = constants;
+import { CgateCommandChannel } from './cgateCommandChannel';
+import { CgateEventBridge } from './cgateEventBridge';
 
 const TREE_START = /^343/m;
 const TREE_END = /^344[ \t]/m;
 const TREE_TIMEOUT_MS = 10000;
-const CMD_TIMEOUT_MS = 8000;
-// A response line is terminal when the 3-digit code is followed by a space;
-// continuation lines use "CODE-". Codes >= 400 indicate an error.
-const CMD_TERMINAL = /^(\d{3}) /;
-const CMD_ERROR_CODE = 400;
 
 export class CgateService extends EventEmitter {
-  private command: any = null;
-  private event: any = null;
+  private command: CgateConnection | null = null;
+  private event: CgateConnection | null = null;
   private status: ConnectionStatus = 'disconnected';
-  // Cancel callbacks for the in-flight command-channel op (getTree / sendCommand)
-  // so disconnect() can settle it promptly instead of leaving a hung promise /
-  // leaked timer (I3). Each op registers its own canceller with its own message.
-  private pendingCommands = new Set<() => void>();
-  // The loaded C-Gate project name (e.g. "5COGAN"), needed to build command
-  // paths like //PROJECT/254/56/4. Resolved lazily from PROJECT LIST (or taken
-  // from ConnectOptions.project) and cached for the life of the connection.
   private projectName: string | null = null;
-  // Serialize command/response exchanges on the single command connection so
-  // their replies can't interleave. Each entry runs to completion before the
-  // next starts.
-  private commandBusy = false;
-  private commandQueue: Array<() => void> = [];
-  // Single persistent reader for the command connection. Complete lines are fed
-  // to the active consumer (a getTree or sendCommand in progress); lines that
-  // arrive with no active consumer (the connect greeting, the EVENT / LOGIN
-  // acks, stray async output) are discarded so they can't contaminate the next
-  // command's response. A StringDecoder ensures multibyte UTF-8 characters split
-  // across socket chunks aren't corrupted (M6).
-  private commandBuf = '';
-  private commandDecoder = new StringDecoder('utf8');
-  private commandConsumer: ((line: string) => void) | null = null;
-  // Event-stream line assembly: buffer partial lines across chunks and decode
-  // with a StringDecoder so split multibyte characters survive (M6).
-  private eventBuf = '';
-  private eventDecoder = new StringDecoder('utf8');
-  // Per-address timers that clear a group's transient `ramping` flag if no
-  // settling (on/off/level) event arrives. C-Gate emits a `ramp` event when a
-  // ramp starts but not always a clean "finished" one, so this backstop ensures
-  // the Stop control can never get stuck visible.
-  private rampTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private serverGreeting: string | null = null;
   private connectOpts: Pick<ConnectOptions, 'host' | 'commandPort' | 'eventPort'> | null = null;
-  // Bumped on each connect()/disconnect() so overlapping connects can abort cleanly.
   private connectGeneration = 0;
-  // Last-known health per network address (from NET LIST / GET / after sync).
   private networkHealth = new Map<string, CgateNetworkInfo>();
-  private activitySeq = 0;
-  private activityLog: ActivityEntry[] = [];
-  private static readonly ACTIVITY_MAX = 200;
+  private lastError: string | null = null;
   private static readonly SYNC_TIMEOUT_MS = 120_000;
+
+  private readonly channel = new CgateCommandChannel({
+    onActivity: (entry) => this.emit('activity', entry),
+    onGreeting: (line) => {
+      this.serverGreeting = line;
+    },
+  });
+
+  private readonly events = new CgateEventBridge({
+    treeChanged: (c) => this.emit('treeChanged', c),
+    measurement: (m) => this.emit('measurement', m),
+    trigger: (t) => this.emit('trigger', t),
+    state: (s) => this.emit('state', s),
+  });
 
   private setStatus(s: ConnectionStatus) {
     this.status = s;
     this.emit('status', s);
   }
 
-  // Re-emit socket errors as our own 'error' event, but only when something is
-  // listening. EventEmitter throws on an 'error' emit with no listener, which
-  // in the Electron main process would crash it; the IPC layer only subscribes
-  // to status/state, so a transient socket error must never be fatal (C1).
   private safeEmitError(e: Error) {
+    this.lastError = e.message ? String(e.message).slice(0, 500) : 'Unknown error';
     this.setStatus('error');
     if (this.listenerCount('error') > 0) this.emit('error', e);
   }
 
-  // Tear down sockets and settle/clear the command channel without flipping to
-  // 'disconnected' (used when replacing a connection during connect()).
   private teardownConnections(): void {
-    for (const cancel of [...this.pendingCommands]) cancel();
-    this.pendingCommands.clear();
-    this.commandQueue = [];
-    this.commandBusy = false;
-    this.commandConsumer = null;
-    this.clearRampTimers();
-    this.command?.disconnect();
+    this.channel.teardown();
+    this.events.reset();
     this.event?.disconnect();
     this.command = null;
     this.event = null;
-    this.commandBuf = '';
-    this.eventBuf = '';
     this.serverGreeting = null;
     this.networkHealth.clear();
   }
@@ -127,14 +83,11 @@ export class CgateService extends EventEmitter {
   }
 
   async connect(opts: ConnectOptions): Promise<void> {
-    // Re-connect safety: Connect/Reconnect can be clicked again while a prior
-    // connect or getTree is still running. Serialize via connectGeneration and
-    // tear down the prior pair without a disconnected status flash.
     const gen = ++this.connectGeneration;
     this.teardownConnections();
     this.assertConnectGeneration(gen);
     this.setStatus('connecting');
-    // Prefer an explicitly configured project; otherwise discover it lazily.
+    this.lastError = null;
     this.projectName = opts.project ?? null;
     this.connectOpts = { host: opts.host, commandPort: opts.commandPort, eventPort: opts.eventPort };
     this.serverGreeting = null;
@@ -143,17 +96,12 @@ export class CgateService extends EventEmitter {
       cgatepassword: opts.password,
     });
     this.event = new CgateConnection('event', opts.host, opts.eventPort, {});
+    this.channel.setConnection(this.command);
+    this.channel.resetBuffers();
+    this.events.reset();
 
-    this.commandBuf = '';
-    this.commandDecoder = new StringDecoder('utf8');
-    this.commandConsumer = null;
-    this.eventBuf = '';
-    this.eventDecoder = new StringDecoder('utf8');
-    this.command.on('data', (buf: Buffer) => this.onCommandData(buf));
-    this.event.on('data', (buf: Buffer) => this.handleEventData(buf));
-    // Both connections need a persistent error listener: CgateConnection emits
-    // 'error' on socket failures at any time, and an unhandled emit would crash
-    // the process (C1/C2). Route both through safeEmitError.
+    this.command.on('data', (buf: Buffer) => this.channel.onData(buf));
+    this.event.on('data', (buf: Buffer) => this.events.onData(buf));
     this.command.on('error', (e: Error) => this.safeEmitError(e));
     this.event.on('error', (e: Error) => this.safeEmitError(e));
     this.event.on('close', () => this.setStatus('reconnecting'));
@@ -166,86 +114,40 @@ export class CgateService extends EventEmitter {
       this.assertConnectGeneration(gen);
     } catch (e) {
       if (e instanceof Error && e.message === CONNECTION_SUPERSEDED) throw e;
-      // Partial-connect failure: tear down BOTH connections so the side that
-      // did connect isn't orphaned and the failed side doesn't self-reconnect
-      // (poolIndex < 0). Leave a definitive status, then rethrow (I4).
       this.command?.disconnect();
       this.event?.disconnect();
       this.command = null;
       this.event = null;
+      this.channel.setConnection(null);
       this.setStatus('error');
+      this.lastError = e instanceof Error ? e.message : String(e);
       throw e;
     }
-    // Drain the command-connection handshake (greeting + EVENT / LOGIN acks)
-    // before allowing commands, so those unsolicited responses can't be
-    // mistaken for the reply to the first command we send.
-    await this.drainHandshake();
+    await this.channel.drainHandshake();
     this.assertConnectGeneration(gen);
     this.setStatus('connected');
   }
 
-  // Consume and discard command-stream lines until the stream goes quiet,
-  // bounded by a hard cap. Used once after connect to swallow the greeting and
-  // the EVENT / LOGIN acknowledgements.
-  private drainHandshake(quietMs = 120, maxMs = 1000): Promise<void> {
-    return new Promise((resolve) => {
-      let quietTimer: ReturnType<typeof setTimeout>;
-      const done = () => {
-        clearTimeout(quietTimer);
-        clearTimeout(maxTimer);
-        if (this.commandConsumer === drain) this.commandConsumer = null;
+  private waitForConnect(conn: CgateConnection): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const onConnect = () => {
+        cleanup();
         resolve();
       };
-      const arm = () => { clearTimeout(quietTimer); quietTimer = setTimeout(done, quietMs); };
-      const drain = (line: string) => {
-        if (isServiceReadyLine(line)) this.serverGreeting = line;
-        arm();
+      const onError = (e: Error) => {
+        cleanup();
+        reject(e);
       };
-      const maxTimer = setTimeout(done, maxMs);
-      this.commandConsumer = drain;
-      arm();
-    });
-  }
-
-  private waitForConnect(conn: any): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const onConnect = () => { cleanup(); resolve(); };
-      const onError = (e: Error) => { cleanup(); reject(e); };
-      const cleanup = () => { conn.off('connect', onConnect); conn.off('error', onError); };
+      const cleanup = () => {
+        conn.off('connect', onConnect);
+        conn.off('error', onError);
+      };
       conn.on('connect', onConnect);
       conn.on('error', onError);
       conn.connect();
     });
   }
 
-  // Persistent command-stream reader: split into complete lines and hand each
-  // to the active consumer; discard lines that arrive with no consumer.
-  private onCommandData(buf: Buffer) {
-    this.commandBuf += this.commandDecoder.write(buf);
-    let idx;
-    while ((idx = this.commandBuf.indexOf('\n')) !== -1) {
-      const line = this.commandBuf.slice(0, idx).replace(/\r$/, '');
-      this.commandBuf = this.commandBuf.slice(idx + 1);
-      const consumer = this.commandConsumer;
-      if (!consumer) {
-        if (isServiceReadyLine(line)) this.serverGreeting = line;
-        continue;
-      }
-      // A consumer must never throw out of here (socket 'data' event) or it
-      // would crash the main process.
-      try {
-        consumer(line);
-      } catch {
-        /* consumers settle their own promises; swallow to protect the process */
-      }
-    }
-  }
-
-  // Request the TREEXML for a network, accumulating response lines until the
-  // 344 terminator, then parse the 343/347 payload into a Tree. Runs through the
-  // command mutex (M5) so it can't interleave with other command-channel ops.
-  // Prefers project-qualified `TREEXML //project/net` (C-Gate 3.x); falls back
-  // to bare `TREEXML net` for older servers.
   async getTree(network: string): Promise<Tree> {
     const project = await this.getProjectName();
     if (project) {
@@ -253,7 +155,6 @@ export class CgateService extends EventEmitter {
         return await this.fetchTreexml(`//${project}/${network}`, network);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        // Don't fall back after a disconnect / supersession — surface it.
         if (
           /disconnected/i.test(msg) ||
           msg === 'Not connected' ||
@@ -261,178 +162,84 @@ export class CgateService extends EventEmitter {
         ) {
           throw e;
         }
-        // Older C-Gate or path rejected — try bare network id.
       }
     }
     return this.fetchTreexml(network, network);
   }
 
   private fetchTreexml(target: string, networkForParse: string): Promise<Tree> {
-    return this.runExclusive(() => new Promise<Tree>((resolve, reject) => {
-      const conn = this.command;
-      if (!conn) {
-        reject(new Error('Not connected'));
-        return;
-      }
-      const lines: string[] = [];
-      let settled = false;
-      let timer: ReturnType<typeof setTimeout>;
+    return this.channel.runExclusive(
+      () =>
+        new Promise<Tree>((resolve, reject) => {
+          const conn = this.channel.getConnection();
+          if (!conn) {
+            reject(new Error('Not connected'));
+            return;
+          }
+          const lines: string[] = [];
+          let settled = false;
+          let timer: ReturnType<typeof setTimeout>;
 
-      const settle = (apply: () => void) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (this.commandConsumer === consume) this.commandConsumer = null;
-        this.pendingCommands.delete(cancel);
-        apply();
-      };
+          const settle = (apply: () => void) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            this.channel.detachConsumer(consume, cancel);
+            apply();
+          };
 
-      const consume = (line: string) => {
-        lines.push(line);
-        if (/^4\d{2} /.test(line)) {
-          settle(() => reject(new Error(`C-Gate ${line}`)));
-          return;
-        }
-        if (!TREE_END.test(line)) return;
-        const startIdx = lines.findIndex((l) => TREE_START.test(l));
-        const frame = (startIdx === -1 ? lines : lines.slice(startIdx)).join('\n');
-        parseTreeXml(frame, networkForParse).then(
-          (tree) => settle(() => resolve(tree as Tree)),
-          (err: Error) => settle(() => reject(err)),
-        );
-      };
+          const consume = (line: string) => {
+            lines.push(line);
+            if (/^4\d{2} /.test(line)) {
+              settle(() => reject(new Error(`C-Gate ${line}`)));
+              return;
+            }
+            if (!TREE_END.test(line)) return;
+            const startIdx = lines.findIndex((l) => TREE_START.test(l));
+            const frame = (startIdx === -1 ? lines : lines.slice(startIdx)).join('\n');
+            parseTreeXml(frame, networkForParse).then(
+              (tree) => settle(() => resolve(tree as Tree)),
+              (err: Error) => settle(() => reject(err)),
+            );
+          };
 
-      // Invoked by disconnect() to reject this getTree without leaking the
-      // timer/consumer (I3).
-      const cancel = () => settle(() => reject(new Error('Disconnected during getTree')));
+          const cancel = () => settle(() => reject(new Error('Disconnected during getTree')));
 
-      timer = setTimeout(() => settle(() => reject(new Error('TREEXML timed out'))), TREE_TIMEOUT_MS);
-      this.pendingCommands.add(cancel);
-      this.commandConsumer = consume;
-      conn.send(`TREEXML ${target}\r\n`);
-    }));
+          timer = setTimeout(
+            () => settle(() => reject(new Error('TREEXML timed out'))),
+            TREE_TIMEOUT_MS,
+          );
+          this.channel.attachConsumer(consume, cancel);
+          conn.send(`TREEXML ${target}\r\n`);
+        }),
+    );
   }
 
-  // --- Command/response (M2 control, M3 rename) -----------------------------
-
-  // Send a single command on the command connection and resolve with its parsed
-  // response. Calls are serialized (see commandQueue) so concurrent commands
-  // never interleave their replies on the shared stream.
   sendCommand(cmd: string, opts?: { timeoutMs?: number }): Promise<CommandResult> {
-    return this.runExclusive(() => this.sendCommandRaw(cmd, opts?.timeoutMs ?? CMD_TIMEOUT_MS));
-  }
-
-  private runExclusive<T>(fn: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const run = () => {
-        fn().then(resolve, reject).finally(() => {
-          const next = this.commandQueue.shift();
-          if (next) next();
-          else this.commandBusy = false;
-        });
-      };
-      if (this.commandBusy) this.commandQueue.push(run);
-      else { this.commandBusy = true; run(); }
-    });
-  }
-
-  private noteActivity(direction: ActivityEntry['direction'], text: string) {
-    const entry: ActivityEntry = {
-      id: ++this.activitySeq,
-      at: Date.now(),
-      direction,
-      text,
-    };
-    this.activityLog.push(entry);
-    if (this.activityLog.length > CgateService.ACTIVITY_MAX) {
-      this.activityLog.splice(0, this.activityLog.length - CgateService.ACTIVITY_MAX);
-    }
-    this.emit('activity', entry);
+    return this.channel.sendCommand(cmd, opts);
   }
 
   getActivityLog(): ActivityEntry[] {
-    return [...this.activityLog];
+    return this.channel.getActivityLog();
   }
 
   private rememberNetwork(info: CgateNetworkInfo) {
     this.networkHealth.set(info.address, info);
   }
 
-  private sendCommandRaw(cmd: string, timeoutMs: number): Promise<CommandResult> {
-    const conn = this.command;
-    return new Promise<CommandResult>((resolve, reject) => {
-      if (!conn) { reject(new Error('Not connected')); return; }
-      const lines: string[] = [];
-      let settled = false;
-      let timer: ReturnType<typeof setTimeout>;
-
-      const settle = (apply: () => void) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (listIdle) { clearTimeout(listIdle); listIdle = null; }
-        if (this.commandConsumer === consume) this.commandConsumer = null;
-        this.pendingCommands.delete(cancel);
-        apply();
-      };
-
-      // Collect response lines until a terminal one ("CODE "); continuation
-      // lines ("CODE-") accumulate first.
-      //
-      // List commands (PROJECT LIST/DIR, NET LIST) are special on C-Gate 3.x:
-      // the final space-form item line IS the terminal (no trailing 200 OK).
-      // Some older servers emit several space-form item lines then `200 OK`.
-      // Treat space-form list items as tentatively terminal after a short idle,
-      // but settle immediately on a real status line (200 / 124 / errors).
-      let listIdle: ReturnType<typeof setTimeout> | null = null;
-      const isListItem = (line: string) =>
-        (/^12[34]\s/i.test(line) && /project=/i.test(line)) ||
-        (/^131\s/i.test(line) && /network=/i.test(line));
-      const consume = (line: string) => {
-        lines.push(line);
-        if (isListItem(line)) {
-          if (listIdle) clearTimeout(listIdle);
-          const code = parseInt(line.slice(0, 3), 10);
-          const text = line.slice(4);
-          listIdle = setTimeout(() => {
-            listIdle = null;
-            this.noteActivity('rx', lines.join(' | '));
-            settle(() => resolve({ code, text, lines: [...lines] }));
-          }, 40);
-          return;
-        }
-        if (!CMD_TERMINAL.test(line)) return;
-        if (listIdle) { clearTimeout(listIdle); listIdle = null; }
-        const code = parseInt(line.slice(0, 3), 10);
-        const text = line.slice(4);
-        if (code >= CMD_ERROR_CODE) {
-          this.noteActivity('rx', lines.join(' | '));
-          settle(() => reject(new Error(`C-Gate ${code}: ${text}`)));
-        } else {
-          this.noteActivity('rx', lines.join(' | '));
-          settle(() => resolve({ code, text, lines: [...lines] }));
-        }
-      };
-
-      const cancel = () => settle(() => reject(new Error('Disconnected during command')));
-
-      timer = setTimeout(() => settle(() => reject(new Error(`Command timed out: ${cmd}`))), timeoutMs);
-      this.pendingCommands.add(cancel);
-      this.commandConsumer = consume;
-      this.noteActivity('tx', cmd);
-      conn.send(`${cmd}\r\n`);
-    });
+  private noteListFailure(op: string, e: unknown): void {
+    const msg = e instanceof Error ? e.message : String(e);
+    this.lastError = `${op}: ${msg}`.slice(0, 500);
   }
 
-  // Resolve (and cache) the C-Gate project name. Parses `project=<name>` from a
-  // PROJECT LIST response. Returns '' if none could be determined.
   async getProjectName(): Promise<string> {
     if (this.projectName != null) return this.projectName;
     try {
       const res = await this.sendCommand('PROJECT LIST');
       const m = res.lines.join('\n').match(/project=(?:"([^"]+)"|(\S+))/i);
       this.projectName = m ? (m[1] ?? m[2]) : '';
-    } catch {
+    } catch (e) {
+      this.noteListFailure('PROJECT LIST', e);
       this.projectName = '';
     }
     return this.projectName;
@@ -441,7 +248,8 @@ export class CgateService extends EventEmitter {
   async listProjectsOnDisk(): Promise<CgateProjectInfo[]> {
     try {
       return parseProjectLines((await this.sendCommand('PROJECT DIR')).lines);
-    } catch {
+    } catch (e) {
+      this.noteListFailure('PROJECT DIR', e);
       return [];
     }
   }
@@ -449,7 +257,8 @@ export class CgateService extends EventEmitter {
   async listLoadedProjects(): Promise<CgateProjectInfo[]> {
     try {
       return parseProjectLines((await this.sendCommand('PROJECT LIST')).lines);
-    } catch {
+    } catch (e) {
+      this.noteListFailure('PROJECT LIST', e);
       return [];
     }
   }
@@ -473,29 +282,34 @@ export class CgateService extends EventEmitter {
       const nets = parseNetworkLines((await this.sendCommand('NET LIST')).lines);
       for (const n of nets) this.rememberNetwork(n);
       return nets;
-    } catch {
+    } catch (e) {
+      this.noteListFailure('NET LIST', e);
       return [];
     }
   }
 
   async openNetwork(network: string): Promise<CommandResult> {
-    const res = await this.sendCommand(`NET OPEN ${network}`, { timeoutMs: CgateService.SYNC_TIMEOUT_MS });
-    this.noteActivity('info', `Network ${network} open`);
+    const res = await this.sendCommand(`NET OPEN ${network}`, {
+      timeoutMs: CgateService.SYNC_TIMEOUT_MS,
+    });
+    this.channel.noteActivity('info', `Network ${network} open`);
     await this.refreshNetworkHealth(network).catch(() => {});
     return res;
   }
 
   async closeNetwork(network: string): Promise<CommandResult> {
     const res = await this.sendCommand(`NET CLOSE ${network}`);
-    this.noteActivity('info', `Network ${network} closed`);
+    this.channel.noteActivity('info', `Network ${network} closed`);
     await this.refreshNetworkHealth(network).catch(() => {});
     return res;
   }
 
   async syncNetwork(network: string): Promise<CommandResult> {
-    this.noteActivity('info', `Syncing network ${network}…`);
-    const res = await this.sendCommand(`DO ${network} SYNC`, { timeoutMs: CgateService.SYNC_TIMEOUT_MS });
-    this.noteActivity('info', `Sync complete for ${network}`);
+    this.channel.noteActivity('info', `Syncing network ${network}…`);
+    const res = await this.sendCommand(`DO ${network} SYNC`, {
+      timeoutMs: CgateService.SYNC_TIMEOUT_MS,
+    });
+    this.channel.noteActivity('info', `Sync complete for ${network}`);
     await this.refreshNetworkHealth(network).catch(() => {});
     return res;
   }
@@ -515,7 +329,9 @@ export class CgateService extends EventEmitter {
         const res = await this.sendCommand(`GET ${path} ${param}`);
         const parsed = parseNetworkHealthFromGet(network, res.lines);
         if (param === 'State' && parsed.state) merged.state = parsed.state;
-        if (param === 'InterfaceState' && parsed.interfaceState) merged.interfaceState = parsed.interfaceState;
+        if (param === 'InterfaceState' && parsed.interfaceState) {
+          merged.interfaceState = parsed.interfaceState;
+        }
         if (param === 'SyncState' && parsed.syncState) merged.syncState = parsed.syncState;
       } catch {
         // Parameter may be unsupported — keep prior value.
@@ -539,9 +355,6 @@ export class CgateService extends EventEmitter {
     return networkNeedsForce(this.networkHealth.get(network)) ? ' FORCE' : '';
   }
 
-  // Set a group's level (0-255). 0 => OFF (instant), 255 with no ramp => ON
-  // (instant), anything else => RAMP to that level, optionally over rampSecs.
-  // Appends FORCE when the network is in State=new / mid-sync (M7).
   async setLevel(ref: GroupRef, level: number, rampSecs?: number): Promise<CommandResult> {
     const path = await this.groupPath(ref);
     const lv = Math.max(0, Math.min(255, Math.round(level)));
@@ -554,35 +367,22 @@ export class CgateService extends EventEmitter {
   }
 
   async terminateRamp(ref: GroupRef): Promise<CommandResult> {
-    return this.sendCommand(`TERMINATERAMP ${await this.groupPath(ref)}${this.forceSuffix(ref.network)}`);
+    return this.sendCommand(
+      `TERMINATERAMP ${await this.groupPath(ref)}${this.forceSuffix(ref.network)}`,
+    );
   }
 
-  // Fire a C-Bus scene by sending an action selector to a Trigger Control
-  // (application 202) group. Transient — the trigger application carries no
-  // persisted state, so this only requests the action; observed activity comes
-  // back on the event stream (see handleEventData -> 'trigger').
-  // Confirmed on C-Gate 3.3.2: `TRIGGER EVENT //proj/net/202/g sel` → 200 OK.
   async fireScene(ref: GroupRef, actionSelector: number): Promise<CommandResult> {
     const sel = Math.max(0, Math.min(255, Math.round(actionSelector)));
-    return this.sendCommand(this.sceneCommand(await this.groupPath(ref), sel));
+    return this.sendCommand(`TRIGGER EVENT ${await this.groupPath(ref)} ${sel}`);
   }
 
-  private sceneCommand(path: string, actionSelector: number): string {
-    return `TRIGGER EVENT ${path} ${actionSelector}`;
-  }
-
-  // Lazily fetch a group's project-DB tag name and current level, used to enrich
-  // the tree node-by-node after the initial load. Each query is independent and
-  // guarded: a missing tag DB or an unsupported parameter yields null rather than
-  // failing the whole detail fetch. Runs over the serialized command channel.
   async getGroupDetail(ref: GroupRef): Promise<GroupDetail> {
     const path = await this.groupPath(ref);
     let label: string | null = null;
     let level: number | null = null;
 
     try {
-      // C-Gate 3.x wants `DBGET //proj/net/app/group/TagName` (slash form).
-      // Older servers accept `DBGET //proj/net/app/group TagName` (space form).
       let res: CommandResult;
       try {
         res = await this.sendCommand(`DBGET ${path}/TagName`);
@@ -591,13 +391,11 @@ export class CgateService extends EventEmitter {
       }
       const blob = res.lines.join('\n');
       const m =
-        blob.match(/TagName="([^"]*)"/i) ||
-        blob.match(/TagName=([^\r\n]+)/i);
+        blob.match(/TagName="([^"]*)"/i) || blob.match(/TagName=([^\r\n]+)/i);
       const tag = m?.[1]?.trim();
-      // C-Gate uses "<Unused>" (and blanks) for groups with no real label.
       label = tag && tag !== '<Unused>' ? tag : null;
     } catch {
-      // No tag DB / object not in DB — leave label null.
+      // No tag DB
     }
 
     try {
@@ -605,14 +403,12 @@ export class CgateService extends EventEmitter {
       const m = res.lines.join('\n').match(/level=(\d+)/i);
       if (m) level = Number(m[1]);
     } catch {
-      // level not queryable — leave null.
+      // level not queryable
     }
 
     return { label, level };
   }
 
-  // Fetch group levels per application. Network-wide `GET //net/* level` fails on
-  // C-Gate 3.x when any app lacks a level parameter (e.g. 223). Per-app form works.
   async getNetworkLevels(
     network: string,
     applications: string[] = ['56'],
@@ -623,31 +419,24 @@ export class CgateService extends EventEmitter {
     const apps = applications.length > 0 ? applications : ['56'];
     for (const app of apps) {
       try {
-        const res = await this.sendCommand(this.bulkLevelCommand(`${prefix}${network}`, app));
+        const res = await this.sendCommand(`GET ${prefix}${network}/${app}/* level`);
         for (const line of res.lines) {
           const m = line.match(/\/(\d+)\/(\d+)\/(\d+):\s*level=(\d+)/i);
           if (m) out[`${m[1]}/${m[2]}/${m[3]}`] = Number(m[4]);
         }
       } catch {
-        // App missing or level unsupported — skip; caller may enrich per-group.
+        // skip app
       }
     }
     return out;
   }
 
-  private bulkLevelCommand(networkPath: string, application: string): string {
-    return `GET ${networkPath}/${application}/* level`;
-  }
-
-  /** Ask a unit to identify itself (typically blink). Transient — no DB write. */
   async identifyUnit(network: string, unitAddress: string): Promise<CommandResult> {
     const project = await this.getProjectName();
     const prefix = project ? `//${project}/` : '//';
     return this.sendCommand(`ID ${prefix}${network}/p/${unitAddress}`);
   }
 
-  // Rename a group's project-DB label via TagName (C-Gate 3.x slash form).
-  // Blank names soft-delete the tag (`<Unused>`), matching Toolkit / cgateweb.
   async setName(ref: GroupRef, name: string): Promise<CommandResult> {
     if (!name.trim()) return this.clearTagName(ref);
     return this.setTagName(ref, name);
@@ -690,14 +479,11 @@ export class CgateService extends EventEmitter {
     return parseObjectParams(res.lines);
   }
 
-  // Persist project DB changes (e.g. renamed labels) to disk. The only command
-  // that writes to the project — gated behind explicit confirmation in the UI.
   async saveProject(): Promise<CommandResult> {
     const project = await this.getProjectName();
     return this.sendCommand(`PROJECT SAVE${project ? ` ${project}` : ''}`);
   }
 
-  /** Query live C-Gate server status: version greeting, loaded/on-disk projects. */
   async getServerStatus(): Promise<CgateServerStatus> {
     const base: CgateServerStatus = {
       connection: this.status,
@@ -711,6 +497,7 @@ export class CgateService extends EventEmitter {
       activeProject: null,
       loadedProjects: [],
       projectsOnDisk: [],
+      lastError: this.lastError,
     };
 
     if (this.status !== 'connected' || !this.command) return base;
@@ -719,10 +506,14 @@ export class CgateService extends EventEmitter {
     let projectsOnDisk = base.projectsOnDisk;
     try {
       loadedProjects = parseProjectLines((await this.sendCommand('PROJECT LIST')).lines);
-    } catch { /* C-Gate may reject when no tag DB — leave empty */ }
+    } catch (e) {
+      this.noteListFailure('PROJECT LIST (status)', e);
+    }
     try {
       projectsOnDisk = parseProjectLines((await this.sendCommand('PROJECT DIR')).lines);
-    } catch { /* same */ }
+    } catch (e) {
+      this.noteListFailure('PROJECT DIR (status)', e);
+    }
 
     const projectName = await this.getProjectName();
     return {
@@ -730,78 +521,8 @@ export class CgateService extends EventEmitter {
       loadedProjects,
       projectsOnDisk,
       activeProject: resolveActiveProject(loadedProjects, projectName || null),
+      lastError: this.lastError,
     };
-  }
-
-  private handleEventData(buf: Buffer) {
-    // Buffer partial lines across chunks and decode with StringDecoder so a line
-    // (or a multibyte character) split across TCP packets parses correctly (M6).
-    this.eventBuf += this.eventDecoder.write(buf);
-    let idx;
-    while ((idx = this.eventBuf.indexOf('\n')) !== -1) {
-      const line = this.eventBuf.slice(0, idx).replace(/\r$/, '');
-      this.eventBuf = this.eventBuf.slice(idx + 1);
-      if (!line.trim()) continue;
-      if (line.startsWith(CGATE_RESPONSE_SYSTEM_EVENT)) {
-        // 742 async object event from another client — emit a reconcile signal.
-        const m = line.match(/\/\/[^/]+\/(\d+)\b/);
-        this.emit('treeChanged', { network: m ? m[1] : null, raw: line });
-        continue;
-      }
-      const measurement = parseMeasurementEvent(line);
-      if (measurement) {
-        this.emit('measurement', measurement);
-        continue;
-      }
-      // Parse/emit per line under a guard: this runs on a socket 'data' event,
-      // so a single malformed line (or a throwing 'state' listener) must not
-      // escape as an uncaught exception and crash the main process.
-      try {
-        const evt = new CBusEvent(line);
-        if (!evt.isValid()) continue;
-        const network = evt.getNetwork()!;
-        const application = evt.getApplication()!;
-        const group = evt.getGroup()!;
-        const address = `${network}/${application}/${group}`;
-        if (evt.getDeviceType() === 'trigger') {
-          // Trigger-control event: report the action selector, not on/off state.
-          const actionSelector = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
-          this.emit('trigger', { address, network, application, group, actionSelector });
-          continue;
-        }
-        const level = evt.getLevel() ?? (evt.getAction() === 'on' ? 255 : 0);
-        const ramping = evt.getAction() === 'ramp';
-        this.emit('state', { address, level, on: level > 0, ramping });
-        this.trackRamp(address, level, ramping);
-      } catch {
-        // Ignore an individual bad event line and keep processing the rest.
-      }
-    }
-  }
-
-  // Manage the safety timer for a group's `ramping` flag. A fresh `ramp` event
-  // (re)arms the timer; a settling event clears it. If the timer fires, emit a
-  // final non-ramping state so the UI drops the Stop control.
-  private static readonly RAMP_SETTLE_MS = 12000;
-  private trackRamp(address: string, level: number, ramping: boolean) {
-    const existing = this.rampTimers.get(address);
-    if (existing) clearTimeout(existing);
-    if (!ramping) {
-      this.rampTimers.delete(address);
-      return;
-    }
-    this.rampTimers.set(
-      address,
-      setTimeout(() => {
-        this.rampTimers.delete(address);
-        this.emit('state', { address, level, on: level > 0, ramping: false });
-      }, CgateService.RAMP_SETTLE_MS),
-    );
-  }
-
-  private clearRampTimers() {
-    for (const t of this.rampTimers.values()) clearTimeout(t);
-    this.rampTimers.clear();
   }
 
   async disconnect(): Promise<void> {
@@ -809,8 +530,16 @@ export class CgateService extends EventEmitter {
     this.teardownConnections();
     this.projectName = null;
     this.connectOpts = null;
+    this.lastError = null;
     this.setStatus('disconnected');
   }
 
-  getStatus(): ConnectionStatus { return this.status; }
+  getStatus(): ConnectionStatus {
+    return this.status;
+  }
+
+  /** Test / diagnostic hook — feed a raw event-stream chunk. */
+  handleEventData(buf: Buffer): void {
+    this.events.onData(buf);
+  }
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, shell } from 'electron';
 import path from 'path';
 import { registerIpc, CHANNELS } from './ipc';
 import { SiteStore } from './SiteStore';
@@ -21,6 +21,18 @@ process.on('unhandledRejection', (reason) => {
 
 let win: BrowserWindow | null = null;
 
+function isAllowedDevRendererUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.protocol === 'http:' || u.protocol === 'https:') &&
+      (u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]')
+    );
+  } catch {
+    return false;
+  }
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1100,
@@ -30,10 +42,26 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
-  if (process.env.ELECTRON_RENDERER_URL) {
-    win.loadURL(process.env.ELECTRON_RENDERER_URL);
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https:') || url.startsWith('http:')) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    const allowed =
+      url.startsWith('file:') ||
+      (!app.isPackaged && isAllowedDevRendererUrl(url));
+    if (!allowed) event.preventDefault();
+  });
+
+  const devUrl = process.env.ELECTRON_RENDERER_URL;
+  if (!app.isPackaged && devUrl && isAllowedDevRendererUrl(devUrl)) {
+    win.loadURL(devUrl);
   } else {
     win.loadFile(path.join(__dirname, '../renderer/index.html'));
   }

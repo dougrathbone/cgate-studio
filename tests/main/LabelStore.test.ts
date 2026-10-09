@@ -91,4 +91,19 @@ describe('LabelStore', () => {
     fs.writeFileSync(file, 'null');
     expect(new LabelStore(file).get(null)).toBeNull();
   });
+
+  it('rejects oversized label maps', () => {
+    const store = new LabelStore(file);
+    const groups: Record<string, string> = {};
+    for (let i = 0; i < 50_001; i++) groups[String(i)] = 'x';
+    expect(() =>
+      store.save(null, {
+        source: 'big.cbz',
+        networks: {},
+        applications: {},
+        groups,
+        stats: { networkCount: 0, groupCount: 0, labelCount: 0 },
+      }),
+    ).toThrow(/too large/i);
+  });
 });

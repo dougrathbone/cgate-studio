@@ -35,6 +35,12 @@ describe('SiteForm', () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 
+  it('warns when passwords cannot be persisted', () => {
+    render(<SiteForm mode="add" onAdd={jest.fn()} canPersistPassword={false} />);
+    fireEvent.click(screen.getByText('C-Gate login…'));
+    expect(screen.getByRole('note')).toHaveTextContent(/cannot encrypt saved passwords/i);
+  });
+
   it('edits an existing site including optional login fields', () => {
     const onSave = jest.fn();
     const onCancel = jest.fn();

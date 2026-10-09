@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { LabelImport } from '../shared/types';
+import { MAX_LABEL_MAP_ENTRIES } from './ipcValidate';
 
 interface LabelStoreData {
   /** Labels imported while no site was selected — used as a fallback. */
@@ -70,11 +71,21 @@ function normalizeData(raw: unknown): LabelStoreData {
 }
 
 function sanitize(imp: LabelImport): LabelImport {
+  const networks = recordOfStrings(imp.networks);
+  const applications = recordOfStrings(imp.applications);
+  const groups = recordOfStrings(imp.groups);
+  const total =
+    Object.keys(networks).length +
+    Object.keys(applications).length +
+    Object.keys(groups).length;
+  if (total > MAX_LABEL_MAP_ENTRIES) {
+    throw new Error('Label import too large');
+  }
   return {
     source: String(imp.source ?? ''),
-    networks: recordOfStrings(imp.networks),
-    applications: recordOfStrings(imp.applications),
-    groups: recordOfStrings(imp.groups),
+    networks,
+    applications,
+    groups,
     stats: {
       networkCount: num(imp.stats?.networkCount),
       groupCount: num(imp.stats?.groupCount),

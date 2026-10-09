@@ -12,9 +12,12 @@ Open-source community tool. **Not** a Toolkit clone — no unit programming.
 ## Start here
 
 1. Read [`docs/context/session-starter.md`](docs/context/session-starter.md) — the decisions log.
-2. Read the design spec: [`docs/specs/2026-05-30-cbus-studio-design.md`](docs/specs/2026-05-30-cbus-studio-design.md).
-3. Read the implementation plan in `docs/plans/` before writing code.
+2. Read design specs under [`docs/superpowers/specs/`](docs/superpowers/specs/) (Approach A parity, M11–M14).
+3. Read implementation plans under [`docs/superpowers/plans/`](docs/superpowers/plans/) before writing code.
 4. To reuse the C-Gate client, follow [`docs/context/vendoring-cgate-client.md`](docs/context/vendoring-cgate-client.md) — import `cgateweb/cgate-client`, never the package root.
+
+Private brainstorming artifacts under `docs/specs/` and `docs/plans/` are
+**gitignored** and are not available in a fresh clone — use `docs/superpowers/` instead.
 
 ## Hard constraints (decided during brainstorming)
 
@@ -34,11 +37,15 @@ Open-source community tool. **Not** a Toolkit clone — no unit programming.
 - **M3** Organize: rename labels + `PROJECT SAVE` (gated, confirm-on-save).
 - **M4–M10** shipped on the Approach A roadmap (scenes, sensors, session, health, commission UI, tag DB, diagnostics). Unit programming remains out of scope.
 - **M11** Distribution: optional code signing + notarization in CI, GitHub auto-update, Linux AppImage. See `docs/context/code-signing.md`.
+- **M12** Installer trust helpers (`npm run verify-release`).
+- **M13** Operate polish (display labels, empty states, filter keyboard).
+- **M14** Commission depth (inventory CSV export, refresh params).
 
 ## Conventions
 
 - Test against a **mock C-Gate** (fake TCP server with canned fixtures); CI must not need real hardware.
-- Depend on `cgateweb/cgate-client` at a tagged git ref. Keep only TREEXML / export / the Studio label parser in `src/cgate-client/`.
+- Depend on `cgateweb/cgate-client` at a tagged git ref (`npm ci` always). Keep only TREEXML / export / the Studio label parser in `src/cgate-client/`.
+- Run `npm run test:ci` before pushing (type-check + coverage thresholds).
 
 ## Related repo
 

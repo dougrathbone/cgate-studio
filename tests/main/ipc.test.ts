@@ -19,6 +19,10 @@ jest.mock('../../src/main/projectExport', () => ({
     path: '/tmp/export.xml',
     stats: { networkCount: 1, groupCount: 3, labelCount: 2, unitCount: 1 },
   }),
+  exportInventoryToFile: jest.fn().mockReturnValue({
+    path: '/tmp/inventory.csv',
+    stats: { networkCount: 1, groupCount: 0, labelCount: 0, unitCount: 2 },
+  }),
 }));
 
 jest.mock('../../src/main/CgateService', () => {
@@ -83,13 +87,14 @@ jest.mock('../../src/main/CgateService', () => {
 import { ipcMain, dialog } from 'electron';
 import { registerIpc, CHANNELS } from '../../src/main/ipc';
 import { importLabelsFromFile } from '../../src/main/projectImport';
-import { exportLabelsToFile } from '../../src/main/projectExport';
+import { exportLabelsToFile, exportInventoryToFile } from '../../src/main/projectExport';
 
 const handleMock = ipcMain.handle as jest.Mock;
 const showOpenDialogMock = dialog.showOpenDialog as jest.Mock;
 const showSaveDialogMock = dialog.showSaveDialog as jest.Mock;
 const importMock = importLabelsFromFile as jest.Mock;
 const exportMock = exportLabelsToFile as jest.Mock;
+const inventoryExportMock = exportInventoryToFile as jest.Mock;
 
 function fakeStore() {
   return {
@@ -97,6 +102,7 @@ function fakeStore() {
     add: jest.fn().mockReturnValue([]),
     update: jest.fn().mockReturnValue([]),
     remove: jest.fn().mockReturnValue([]),
+    encryptionAvailable: jest.fn().mockReturnValue(true),
   } as any;
 }
 
@@ -278,6 +284,35 @@ describe('registerIpc', () => {
     expect(exportMock).not.toHaveBeenCalled();
   });
 
+  it('inventory:export writes the chosen CSV and returns stats', async () => {
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/inventory.csv' });
+    registerIpc(() => null, fakeStore(), fakeLabelStore());
+    const input = { tree: [], projectName: 'MYPROJ' };
+    const result = await lastHandler(CHANNELS.inventoryExport)({}, input);
+    expect(showSaveDialogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Export unit inventory' }),
+    );
+    expect(inventoryExportMock).toHaveBeenCalledWith('/tmp/inventory.csv', input);
+    expect(result?.stats.unitCount).toBe(2);
+  });
+
+  it('inventory:export uses the BrowserWindow when one is open', async () => {
+    const win = { id: 9 } as any;
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/tmp/inventory.csv' });
+    registerIpc(() => win, fakeStore(), fakeLabelStore());
+    await lastHandler(CHANNELS.inventoryExport)({}, { tree: [], projectName: 'MYPROJ' });
+    expect(showSaveDialogMock).toHaveBeenCalledWith(win, expect.any(Object));
+  });
+
+  it('inventory:export returns null when the picker is cancelled', async () => {
+    showSaveDialogMock.mockResolvedValue({ canceled: true, filePath: undefined });
+    inventoryExportMock.mockClear();
+    registerIpc(() => null, fakeStore(), fakeLabelStore());
+    const result = await lastHandler(CHANNELS.inventoryExport)({}, { tree: [], projectName: 'X' });
+    expect(result).toBeNull();
+    expect(inventoryExportMock).not.toHaveBeenCalled();
+  });
+
   it('routes nodes:networkLevels with optional applications', async () => {
     const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
     await lastHandler(CHANNELS.networkLevels)({}, '254', ['56']);
@@ -314,5 +349,91 @@ describe('registerIpc', () => {
     await lastHandler(CHANNELS.updateInstall)({});
     expect(updates.check).toHaveBeenCalled();
     expect(updates.quitAndInstall).toHaveBeenCalled();
+  });
+
+  it('rejects invalid project names and SET param names at the IPC boundary', () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    expect(() => lastHandler(CHANNELS.projectLoad)({}, 'bad name')).toThrow(/Invalid project/i);
+    expect(() =>
+      lastHandler(CHANNELS.setGroupParam)(
+        {},
+        { network: '254', application: '56', group: '4' },
+        'Ramp Time',
+        '6',
+      ),
+    ).toThrow(/Invalid parameter/i);
+    expect(svc.loadProject).not.toHaveBeenCalled();
+    expect(svc.setGroupParam).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed group refs and network addresses', () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    expect(() =>
+      lastHandler(CHANNELS.setLevel)({}, { network: 'x', application: '56', group: '4' }, 128),
+    ).toThrow(/Invalid network/i);
+    expect(() => lastHandler(CHANNELS.netOpen)({}, 'net!')).toThrow(/Invalid network/i);
+    expect(svc.setLevel).not.toHaveBeenCalled();
+    expect(svc.openNetwork).not.toHaveBeenCalled();
+  });
+
+  it('reports whether site passwords can be persisted', () => {
+    const store = fakeStore();
+    registerIpc(() => null, store, fakeLabelStore());
+    expect(lastHandler(CHANNELS.sitesCanPersistPassword)({})).toBe(true);
+    expect(store.encryptionAvailable).toHaveBeenCalled();
+  });
+
+  it('forwards service error events as activity notes', () => {
+    const send = jest.fn();
+    const svc = registerIpc(() => ({ webContents: { send } } as any), fakeStore(), fakeLabelStore());
+    svc.emit('error', new Error('socket down'));
+    expect(send).toHaveBeenCalledWith(CHANNELS.status, 'error');
+    expect(send).toHaveBeenCalledWith(
+      CHANNELS.activity,
+      expect.objectContaining({ direction: 'info', text: expect.stringContaining('socket down') }),
+    );
+  });
+
+  it('rejects invalid connect options and site payloads', () => {
+    const store = fakeStore();
+    registerIpc(() => null, store, fakeLabelStore());
+    expect(() =>
+      lastHandler(CHANNELS.connect)({}, { host: 'bad host', commandPort: 20023, eventPort: 20025 }),
+    ).toThrow(/Invalid host/i);
+    expect(() =>
+      lastHandler(CHANNELS.sitesAdd)({}, {
+        name: '',
+        host: '127.0.0.1',
+        commandPort: 20023,
+        eventPort: 20025,
+      }),
+    ).toThrow(/Invalid site name/i);
+    expect(store.add).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid fireScene selectors and identify unit addresses', () => {
+    const svc = registerIpc(() => null, fakeStore(), fakeLabelStore());
+    const ref = { network: '254', application: '202', group: '1' };
+    expect(() => lastHandler(CHANNELS.fireScene)({}, ref, Number.NaN)).toThrow(/Invalid level/i);
+    expect(() => lastHandler(CHANNELS.identifyUnit)({}, '254', 'u')).toThrow(/Invalid unit/i);
+    expect(svc.fireScene).not.toHaveBeenCalled();
+    expect(svc.identifyUnit).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized label imports on save', () => {
+    const labels = fakeLabelStore();
+    registerIpc(() => null, fakeStore(), labels);
+    const groups: Record<string, string> = {};
+    for (let i = 0; i < 50_001; i++) groups[String(i)] = 'x';
+    expect(() =>
+      lastHandler(CHANNELS.sitesLabelsSave)({}, 'site-1', {
+        source: 'x',
+        networks: {},
+        applications: {},
+        groups,
+        stats: { networkCount: 0, groupCount: 0, labelCount: 0 },
+      }),
+    ).toThrow(/too large/i);
+    expect(labels.save).not.toHaveBeenCalled();
   });
 });

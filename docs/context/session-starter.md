@@ -9,7 +9,9 @@ An Electron desktop app (macOS-first, cross-platform bonus) that connects to an
 existing C-Gate server over TCP and lets C-Bus owners browse, test, and organize
 their network without a Windows box running C-Bus Toolkit.
 
-Full design: [`../specs/2026-05-30-cbus-studio-design.md`](../specs/2026-05-30-cbus-studio-design.md)
+Public specs/plans: [`../superpowers/specs/`](../superpowers/specs/) and
+[`../superpowers/plans/`](../superpowers/plans/). (Private `docs/specs/` /
+`docs/plans/` are gitignored and may be absent in a fresh clone.)
 
 ## Decisions log (do not relitigate without reason)
 
@@ -44,9 +46,9 @@ context-isolated IPC bridge and never opens sockets.
 
 ## Where things live
 
-- Spec: `docs/specs/2026-05-30-cbus-studio-design.md`
-- Plan: `docs/plans/` (implementation plan)
-- C-Gate client: [`vendoring-cgate-client.md`](vendoring-cgate-client.md) (git dependency on `cgateweb/cgate-client`)
+- Specs: `docs/superpowers/specs/`
+- Plans: `docs/superpowers/plans/`
+- C-Gate client: [`vendoring-cgate-client.md`](vendoring-cgate-client.md) (tagged git dependency on `cgateweb/cgate-client`; always `npm ci`)
 - Code signing / auto-update: [`code-signing.md`](code-signing.md)
 - Hardware vs CI: [`../smoke-lab-status.md`](../smoke-lab-status.md)
 - Source `cgateweb` repo: https://github.com/dougrathbone/cgateweb

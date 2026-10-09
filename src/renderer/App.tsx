@@ -120,6 +120,7 @@ export function App() {
   const [states, setStates] = useState<Record<string, GroupState>>({});
   const [measurements, setMeasurements] = useState<Record<string, MeasurementState>>({});
   const [sites, setSites] = useState<Site[]>([]);
+  const [canPersistPassword, setCanPersistPassword] = useState(true);
   const [activeSiteId, setActiveSiteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -314,6 +315,9 @@ export function App() {
 
   useEffect(() => {
     cgate().sites.list().then(setSites);
+    void cgate().sites.canPersistPassword?.().then(setCanPersistPassword).catch(() => {
+      setCanPersistPassword(true);
+    });
     // Restore a global label import from the last session (site-specific imports
     // are loaded when that site is connected).
     cgate().sites.getImportedLabels(null).then((imp) => {
@@ -836,6 +840,7 @@ export function App() {
               <SiteForm
                 mode="edit"
                 initial={editingSite}
+                canPersistPassword={canPersistPassword}
                 onSave={(s) => { void saveSite(s); }}
                 onCancel={() => setEditingSite(null)}
               />
@@ -855,6 +860,7 @@ export function App() {
                 {(addSiteOpen ?? sites.length === 0) && (
                   <SiteForm
                     mode="add"
+                    canPersistPassword={canPersistPassword}
                     onAdd={(input) => {
                       void addSite(input);
                       setAddSiteOpen(false);
@@ -901,7 +907,10 @@ export function App() {
                     <button
                       type="button"
                       role="tab"
+                      id="commission-tab-groups"
+                      aria-controls="commission-panel-groups"
                       aria-selected={commissionView === 'groups'}
+                      tabIndex={commissionView === 'groups' ? 0 : -1}
                       className={`commission__tab${commissionView === 'groups' ? ' commission__tab--active' : ''}`}
                       onClick={() => setCommissionView('groups')}
                     >
@@ -910,7 +919,10 @@ export function App() {
                     <button
                       type="button"
                       role="tab"
+                      id="commission-tab-inventory"
+                      aria-controls="commission-panel-inventory"
                       aria-selected={commissionView === 'inventory'}
+                      tabIndex={commissionView === 'inventory' ? 0 : -1}
                       className={`commission__tab${commissionView === 'inventory' ? ' commission__tab--active' : ''}`}
                       onClick={() => setCommissionView('inventory')}
                     >
@@ -928,21 +940,33 @@ export function App() {
                   </button>
                 </div>
                 {commissionView === 'groups' ? (
-                  <GroupsWorkspace
-                    groups={flatGroups}
-                    states={states}
-                    selection={selection}
-                    onSelect={setSelection}
-                    onBulkSetLevel={status === 'connected' ? bulkSetLevel : undefined}
-                    onClearLabels={status === 'connected' ? clearGroupLabels : undefined}
-                    bulkBusy={bulkBusy}
-                  />
+                  <div
+                    id="commission-panel-groups"
+                    role="tabpanel"
+                    aria-labelledby="commission-tab-groups"
+                  >
+                    <GroupsWorkspace
+                      groups={flatGroups}
+                      states={states}
+                      selection={selection}
+                      onSelect={setSelection}
+                      onBulkSetLevel={status === 'connected' ? bulkSetLevel : undefined}
+                      onClearLabels={status === 'connected' ? clearGroupLabels : undefined}
+                      bulkBusy={bulkBusy}
+                    />
+                  </div>
                 ) : (
-                  <InventoryTable
-                    tree={tree}
-                    selection={selection}
-                    onSelect={setSelection}
-                  />
+                  <div
+                    id="commission-panel-inventory"
+                    role="tabpanel"
+                    aria-labelledby="commission-tab-inventory"
+                  >
+                    <InventoryTable
+                      tree={tree}
+                      selection={selection}
+                      onSelect={setSelection}
+                    />
+                  </div>
                 )}
               </div>
             )}
